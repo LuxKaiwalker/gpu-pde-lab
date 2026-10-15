@@ -64,6 +64,42 @@ def test_cg_matches_jacobi_solution_at_convergence():
     assert diff < 1e-3
 
 
+def test_set_rhs_from_array_matches_exactly_and_resets_solution():
+    p = _make()
+    for _ in range(50):
+        p.jacobi_step()
+    p.residual_history.append(p.residual_norm())
+
+    custom_f = np.random.default_rng(0).standard_normal((p.grid.nx, p.grid.ny))
+    p.set_rhs_from_array(custom_f)
+
+    assert np.allclose(p.backend.to_numpy(p.f), custom_f)
+    assert p.residual_history == []
+    assert np.all(p.backend.to_numpy(p.u) == 0.0)
+
+
+def test_poisson_experiment_editable_fields_apply_round_trip():
+    from gpu_pde_lab.experiments.poisson_experiment import PoissonExperiment
+
+    exp = PoissonExperiment()
+    exp.backend_name = "CPU"
+    exp.reset()
+    for _ in range(10):
+        exp.step(0.0)
+
+    specs = exp.editable_fields()
+    assert "f" in specs
+
+    drawn_f = np.zeros((exp.n, exp.n), dtype=np.float64)
+    drawn_f[exp.n // 2, exp.n // 2] = 7.0
+    exp.apply_edited_fields({"f": drawn_f})
+
+    f_now = exp.problem.backend.to_numpy(exp.problem.f)
+    assert f_now[exp.n // 2, exp.n // 2] == pytest.approx(7.0)
+    assert exp._iteration == 0
+    assert np.all(exp.problem.backend.to_numpy(exp.problem.u) == 0.0)
+
+
 @pytest.mark.skipif(not cuda_is_available(), reason="requires CUDA device")
 def test_cg_cpu_gpu_agreement():
     cpu = _make(backend_spec=("torch", "cpu", "fp64"))

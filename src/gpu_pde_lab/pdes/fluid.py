@@ -72,6 +72,24 @@ class StableFluids2D:
         self.time = 0.0
         self.step_count = 0
 
+    def set_fields(self, u: np.ndarray | None = None, v: np.ndarray | None = None,
+                    dye: np.ndarray | None = None) -> None:
+        """Seed one or more fields from user-supplied host arrays (e.g. hand-drawn
+        in the field editor), leaving any field not provided untouched. Never
+        merges u/v/dye into a single buffer -- each stays an independent slot."""
+        if u is not None:
+            self.u = self.backend.array(u)
+        if v is not None:
+            self.v = self.backend.array(v)
+        if dye is not None:
+            self.dye = self.backend.array(dye)
+        if u is not None or v is not None:
+            self._apply_velocity_boundary()
+        if dye is not None:
+            self._apply_scalar_boundary(self.dye)
+        self.time = 0.0
+        self.step_count = 0
+
     # -- boundary handling ("solid box" vs periodic) ------------------------
 
     def _apply_velocity_boundary(self) -> None:

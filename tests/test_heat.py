@@ -66,6 +66,40 @@ def test_dirichlet_zero_boundary_stays_zero():
     assert np.allclose(field[:, -1], 0.0)
 
 
+def test_reset_from_array_seeds_exact_field_and_respects_boundary():
+    heat = _make(boundary=BoundaryKind.DIRICHLET)
+    custom = np.full((heat.grid.nx, heat.grid.ny), 3.5, dtype=np.float64)
+    heat.reset_from_array(custom)
+
+    field = heat.primary_field_numpy()
+    assert np.allclose(field[1:-1, 1:-1], 3.5)
+    # Dirichlet boundary is immediately re-applied, regardless of what was
+    # painted onto the edited field's ring.
+    assert np.allclose(field[0, :], 0.0)
+    assert np.allclose(field[-1, :], 0.0)
+    assert heat.state.time == 0.0
+    assert heat.state.step == 0
+
+
+def test_heat_experiment_editable_fields_apply_round_trip():
+    from gpu_pde_lab.experiments.heat_experiment import HeatExperiment
+
+    exp = HeatExperiment()
+    exp.backend_name = "CPU"
+    exp.reset()
+
+    specs = exp.editable_fields()
+    assert "u0" in specs
+
+    drawn = np.zeros((exp.n, exp.n), dtype=np.float64)
+    drawn[exp.n // 2, exp.n // 2] = 42.0
+    exp.apply_edited_fields({"u0": drawn})
+
+    field = exp.field_numpy()
+    assert field[exp.n // 2, exp.n // 2] == pytest.approx(42.0)
+    assert exp.pde.state.step == 0
+
+
 @pytest.mark.skipif(not cuda_is_available(), reason="requires CUDA device")
 def test_cpu_gpu_agreement():
     cpu = _make(n=48, backend_spec=("torch", "cpu", "fp64"))

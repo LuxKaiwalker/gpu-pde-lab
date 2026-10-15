@@ -14,7 +14,7 @@ from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from ..pdes.fluid import StableFluids2D
 from ..ui.controls import ControlPanel
-from .base import LiveExperiment
+from .base import EditSpec, LiveExperiment
 
 EXPLANATION = r"""
 ### What are we solving?
@@ -99,6 +99,31 @@ class FluidExperiment(LiveExperiment):
         if self.display_mode == "velocity":
             return self.fluid.velocity_magnitude_numpy()
         return self.fluid.dye_numpy()
+
+    # -- field editor hooks ----------------------------------------------
+
+    def editable_fields(self) -> dict[str, EditSpec]:
+        clip = self.boundary != BoundaryKind.PERIODIC
+        return {
+            "u0": EditSpec(key="u0", label="Initial velocity u-component", clip_to_interior=clip),
+            "v0": EditSpec(key="v0", label="Initial velocity v-component", clip_to_interior=clip),
+            "dye0": EditSpec(key="dye0", label="Initial dye concentration", clip_to_interior=clip),
+        }
+
+    def edit_field_numpy(self, key: str) -> np.ndarray:
+        if key == "u0":
+            return self.fluid.backend.to_numpy(self.fluid.u)
+        if key == "v0":
+            return self.fluid.backend.to_numpy(self.fluid.v)
+        if key == "dye0":
+            return self.fluid.backend.to_numpy(self.fluid.dye)
+        raise NotImplementedError(f"FluidExperiment has no editable field {key!r}")
+
+    def apply_edited_fields(self, fields: dict[str, np.ndarray]) -> None:
+        self.fluid.set_fields(u=fields.get("u0"), v=fields.get("v0"), dye=fields.get("dye0"))
+
+    def editor_grid(self):
+        return self.fluid.grid
 
     def supports_click_injection(self) -> bool:
         return True

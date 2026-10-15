@@ -45,11 +45,28 @@ def zeros(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     return np.zeros_like(X)
 
 
+def gradient(X: np.ndarray, Y: np.ndarray, angle_deg: float = 0.0, lo: float = 0.0,
+             hi: float = 1.0) -> np.ndarray:
+    """Linear gradient from ``lo`` to ``hi`` along direction ``angle_deg``
+    (0 = +x, 90 = +y), normalized to the field's own extent so it always
+    spans [lo, hi] regardless of domain size."""
+    theta = np.deg2rad(angle_deg)
+    dirx, diry = np.cos(theta), np.sin(theta)
+    proj = X * dirx + Y * diry
+    proj_min, proj_max = proj.min(), proj.max()
+    if proj_max - proj_min < 1e-12:
+        t = np.zeros_like(proj)
+    else:
+        t = (proj - proj_min) / (proj_max - proj_min)
+    return (lo + t * (hi - lo)).astype(X.dtype)
+
+
 IC_REGISTRY = {
     "point_source": point_source,
     "gaussian": gaussian,
     "multiple_sources": multiple_sources,
     "hot_cold_regions": hot_cold_regions,
+    "gradient": gradient,
     "zeros": zeros,
 }
 

@@ -15,9 +15,9 @@ class HeatmapView(pg.GraphicsLayoutWidget):
 
     clicked_fraction = Signal(float, float)  # (x_frac, y_frac) in [0, 1]
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, view_box: "pg.ViewBox | None" = None):
         super().__init__(parent)
-        self.plot = self.addPlot()
+        self.plot = self.addPlot(viewBox=view_box) if view_box is not None else self.addPlot()
         self.plot.setAspectLocked(True)
         self.plot.hideAxis("bottom")
         self.plot.hideAxis("left")

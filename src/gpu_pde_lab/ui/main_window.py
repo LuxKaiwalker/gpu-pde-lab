@@ -6,10 +6,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -22,9 +24,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..core.boundary import BoundaryKind
+from ..core.config_io import ConfigValidationError, ExperimentConfig, load_config, save_config
 from ..experiments.base import BenchmarkExperiment, LiveExperiment
 from .benchmark_worker import BenchmarkWorker
 from .explanation_panel import ExplanationPanel
+from .field_editor_widget import FieldEditorView
 from .stats_panel import StatsPanel
 from .viz.barchart import BarChartView
 from .viz.heatmap import HeatmapView
@@ -45,13 +50,20 @@ class LivePage(QWidget):
         self.reset_button = QPushButton("Reset")
         self.contour_checkbox = QPushButton("Contours: Off")
         self.contour_checkbox.setCheckable(True)
+        self.edit_ic_button = QPushButton("Edit IC")
+        self.edit_ic_button.setCheckable(True)
+        self.apply_edits_button = QPushButton("Apply edits && Reset")
+        self.save_config_button = QPushButton("Save Config...")
+        self.load_config_button = QPushButton("Load Config...")
         self.speed_label = QLabel("Speed (steps/frame):")
         self.speed_slider = QSlider(Qt.Horizontal)
         self.speed_slider.setRange(1, 50)
         self.speed_slider.setValue(1)
         self.speed_value_label = QLabel("1")
 
-        for w in (self.play_button, self.step_button, self.reset_button, self.contour_checkbox):
+        for w in (self.play_button, self.step_button, self.reset_button, self.contour_checkbox,
+                   self.edit_ic_button, self.apply_edits_button, self.save_config_button,
+                   self.load_config_button):
             toolbar.addWidget(w)
         toolbar.addWidget(self.speed_label)
         toolbar.addWidget(self.speed_slider)
@@ -60,8 +72,12 @@ class LivePage(QWidget):
         layout.addLayout(toolbar)
 
         splitter = QSplitter(Qt.Vertical)
+        self.canvas_stack = QStackedWidget()
         self.heatmap = HeatmapView()
-        splitter.addWidget(self.heatmap)
+        self.field_editor = FieldEditorView()
+        self.canvas_stack.addWidget(self.heatmap)
+        self.canvas_stack.addWidget(self.field_editor)
+        splitter.addWidget(self.canvas_stack)
         self.extra_plot = LinePlotView(title="Residual vs iteration", x_label="iteration",
                                         y_label="residual norm", log_y=True)
         splitter.addWidget(self.extra_plot)
@@ -69,6 +85,10 @@ class LivePage(QWidget):
         layout.addWidget(splitter)
 
         self.speed_slider.valueChanged.connect(lambda v: self.speed_value_label.setText(str(v)))
+        self.edit_ic_button.setVisible(False)
+        self.apply_edits_button.setVisible(False)
+        self.save_config_button.setVisible(False)
+        self.load_config_button.setVisible(False)
 
 
 class BenchmarkPage(QWidget):
@@ -204,6 +224,10 @@ class MainWindow(QMainWindow):
         self.live_page.reset_button.clicked.connect(self._reset_experiment)
         self.live_page.contour_checkbox.toggled.connect(self._toggle_contours)
         self.live_page.heatmap.clicked_fraction.connect(self._on_heatmap_click)
+        self.live_page.edit_ic_button.toggled.connect(self._toggle_edit_mode)
+        self.live_page.apply_edits_button.clicked.connect(self._apply_edited_fields)
+        self.live_page.save_config_button.clicked.connect(self._save_config)
+        self.live_page.load_config_button.clicked.connect(self._load_config)
 
         # wire benchmark-page toolbar
         self.benchmark_page.run_button.clicked.connect(self._run_benchmark)
@@ -246,6 +270,19 @@ class MainWindow(QMainWindow):
             self.live_page.contour_checkbox.setChecked(False)
             self.live_page.contour_checkbox.setText("Contours: Off")
 
+            self.live_page.edit_ic_button.setChecked(False)
+            self.live_page.canvas_stack.setCurrentWidget(self.live_page.heatmap)
+            has_editor = bool(self.current_experiment.editable_fields())
+            self.live_page.edit_ic_button.setVisible(has_editor)
+            self.live_page.apply_edits_button.setVisible(has_editor)
+            self.live_page.save_config_button.setVisible(has_editor)
+            self.live_page.load_config_button.setVisible(has_editor)
+        else:
+            self.live_page.edit_ic_button.setVisible(False)
+            self.live_page.apply_edits_button.setVisible(False)
+            self.live_page.save_config_button.setVisible(False)
+            self.live_page.load_config_button.setVisible(False)
+
     def _rebuild_controls(self) -> None:
         if self.current_controls_widget is not None:
             self.controls_container.removeWidget(self.current_controls_widget)
@@ -284,6 +321,109 @@ class MainWindow(QMainWindow):
         exp = self.current_experiment
         if isinstance(exp, LiveExperiment) and exp.supports_click_injection():
             exp.on_click(x_frac, y_frac)
+
+    def _toggle_edit_mode(self, checked: bool) -> None:
+        exp = self.current_experiment
+        if not isinstance(exp, LiveExperiment):
+            return
+        if checked:
+            specs = exp.editable_fields()
+            grid = exp.editor_grid()
+            if not specs or grid is None:
+                self.live_page.edit_ic_button.setChecked(False)
+                return
+            initial = {key: exp.edit_field_numpy(key) for key in specs}
+            self.live_page.field_editor.bind_fields(specs, initial, grid)
+            self.live_page.canvas_stack.setCurrentWidget(self.live_page.field_editor)
+        else:
+            self.live_page.canvas_stack.setCurrentWidget(self.live_page.heatmap)
+
+    def _apply_edited_fields(self) -> None:
+        exp = self.current_experiment
+        if not isinstance(exp, LiveExperiment):
+            return
+        fields = self.live_page.field_editor.current_fields_numpy()
+        exp.apply_edited_fields(fields)
+        self.live_page.field_editor.mark_applied()
+        self._refresh_live_view()
+
+    def _save_config(self) -> None:
+        exp = self.current_experiment
+        if not isinstance(exp, LiveExperiment):
+            return
+        specs = exp.editable_fields()
+        grid = exp.editor_grid()
+        if not specs or grid is None:
+            return
+
+        path, _ = QFileDialog.getSaveFileName(self, "Save Config", "", "GPU PDE Lab Config (*.npz)")
+        if not path:
+            return
+        if not path.endswith(".npz"):
+            path += ".npz"
+
+        # Pulled via the current edit buffers if the editor is open (so an
+        # in-progress, not-yet-applied drawing can be saved as-is), otherwise
+        # straight from the live simulation.
+        if self.live_page.canvas_stack.currentWidget() is self.live_page.field_editor:
+            fields = self.live_page.field_editor.current_fields_numpy()
+        else:
+            fields = {key: exp.edit_field_numpy(key) for key in specs}
+
+        boundary = getattr(exp, "boundary", None)
+        config = ExperimentConfig(
+            pde_name=exp.title, nx=grid.nx, ny=grid.ny, lx=grid.lx, ly=grid.ly,
+            boundary=boundary.value if boundary is not None else BoundaryKind.NEUMANN.value,
+            params={}, fields=fields,
+        )
+        try:
+            save_config(path, config)
+        except OSError as exc:
+            QMessageBox.warning(self, "Save Config Failed", str(exc))
+
+    def _load_config(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Load Config", "", "GPU PDE Lab Config (*.npz)")
+        if not path:
+            return
+        try:
+            config = load_config(path)
+        except ConfigValidationError as exc:
+            QMessageBox.warning(self, "Load Config Failed", str(exc))
+            return
+
+        if config.pde_name not in self.live_factories:
+            QMessageBox.warning(self, "Load Config Failed",
+                                 f"Unknown experiment type: {config.pde_name!r}")
+            return
+        if config.nx != config.ny:
+            QMessageBox.warning(self, "Load Config Failed", "Only square grids are supported.")
+            return
+
+        index = list(self.live_factories).index(config.pde_name)
+        self.experiment_combo.setCurrentIndex(index)  # rebuilds self.current_experiment
+
+        exp = self.current_experiment
+        specs = exp.editable_fields()
+        missing = set(specs) - set(config.fields)
+        if missing:
+            QMessageBox.warning(self, "Load Config Failed",
+                                 f"Config is missing fields: {sorted(missing)}")
+            return
+
+        exp.n = config.nx
+        if hasattr(exp, "boundary"):
+            try:
+                exp.boundary = BoundaryKind(config.boundary)
+            except ValueError:
+                pass
+        exp.reset()
+
+        try:
+            exp.apply_edited_fields(config.fields)
+        except Exception as exc:  # surfaced to the user rather than crashing the app
+            QMessageBox.warning(self, "Load Config Failed", str(exc))
+            return
+        self._refresh_live_view()
 
     def _on_tick(self) -> None:
         exp = self.current_experiment

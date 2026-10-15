@@ -7,12 +7,14 @@ and compare how naturally each parallelizes.
 
 from __future__ import annotations
 
+import numpy as np
+
 from ..core.backend import Backend, BackendSpec, cuda_is_available
 from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from ..pdes.poisson import PoissonProblem
 from ..ui.controls import ControlPanel
-from .base import LiveExperiment
+from .base import EditSpec, LiveExperiment
 
 EXPLANATION = r"""
 ### What PDE are we solving?
@@ -22,7 +24,11 @@ The Poisson equation, an *elliptic* (steady-state) PDE:
 $$ -\nabla^2 u = f $$
 
 Unlike the heat/wave equations there is no time axis -- we solve for the
-equilibrium field directly.
+equilibrium field directly. The field editor below lets you hand-draw the
+*source* $f(x,y)$ (e.g. where heat/charge is injected or removed) -- it does
+**not** set an initial guess for $u$, which is always re-solved from zero.
+Boundary values of $u$ are fixed separately by the chosen boundary condition,
+independent of whatever $f$ you draw.
 
 ### How is it discretized?
 
@@ -110,6 +116,29 @@ class PoissonExperiment(LiveExperiment):
 
     def field_numpy(self):
         return self.problem.backend.to_numpy(self.problem.u)
+
+    # -- field editor hooks ----------------------------------------------
+
+    def editable_fields(self) -> dict[str, EditSpec]:
+        return {
+            "f": EditSpec(
+                key="f",
+                label="Source term f(x,y) in  -∇²u = f",
+                clip_to_interior=False,
+            )
+        }
+
+    def edit_field_numpy(self, key: str) -> np.ndarray:
+        if key != "f":
+            raise NotImplementedError(f"PoissonExperiment has no editable field {key!r}")
+        return self.problem.backend.to_numpy(self.problem.f)
+
+    def apply_edited_fields(self, fields: dict[str, np.ndarray]) -> None:
+        self.problem.set_rhs_from_array(fields["f"])
+        self._iteration = 0
+
+    def editor_grid(self):
+        return self.problem.grid
 
     def extra_plot_data(self):
         return {"residual_history": list(self.problem.residual_history)}

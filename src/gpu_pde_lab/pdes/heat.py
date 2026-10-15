@@ -49,6 +49,13 @@ class HeatEquation(PDEModel):
         apply_boundary(self.u, self.boundary)
         self.state.reset()
 
+    def reset_from_array(self, u0: np.ndarray) -> None:
+        """Like :meth:`reset`, but seeded from a user-supplied host array
+        (e.g. hand-drawn in the field editor) instead of an `IC_REGISTRY` name."""
+        self.u = self.backend.array(u0)
+        apply_boundary(self.u, self.boundary)
+        self.state.reset()
+
     def dt_max(self) -> float:
         h2 = min(self.grid.dx, self.grid.dy) ** 2
         return h2 / (4.0 * self.alpha)

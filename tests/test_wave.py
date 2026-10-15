@@ -53,6 +53,54 @@ def test_unstable_run_diverges():
     assert not np.all(np.isfinite(field)) or np.abs(field).max() > 1e3
 
 
+def test_reset_from_arrays_encodes_initial_velocity():
+    wave = _make(n=32)
+    nx, ny = wave.grid.nx, wave.grid.ny
+    u0 = np.zeros((nx, ny), dtype=np.float64)
+    v0 = np.full((nx, ny), 2.5, dtype=np.float64)
+    dt = 1e-3
+
+    wave.reset_from_arrays(u0, v0, dt_for_velocity=dt)
+
+    velocity = (wave.u - wave.u_prev) / dt
+    assert np.allclose(velocity[1:-1, 1:-1], 2.5, atol=1e-9)
+    assert wave.state.time == 0.0
+    assert wave.state.step == 0
+
+
+def test_reset_from_arrays_with_no_velocity_matches_zero_velocity_default():
+    wave = _make(n=16)
+    u0 = np.full((16, 16), 1.25, dtype=np.float64)
+    wave.reset_from_arrays(u0, v0=None)
+    assert np.allclose(wave.u, wave.u_prev)
+
+
+def test_wave_experiment_editable_fields_apply_round_trip():
+    from gpu_pde_lab.experiments.wave_experiment import WaveExperiment
+
+    exp = WaveExperiment()
+    exp.backend_name = "CPU"
+    exp.reset()
+
+    specs = exp.editable_fields()
+    assert set(specs) == {"u0", "v0"}
+
+    n = exp.n
+    drawn_u0 = np.zeros((n, n), dtype=np.float64)
+    drawn_u0[n // 2, n // 2] = 7.0
+    drawn_v0 = np.full((n, n), 3.0, dtype=np.float64)
+    exp.apply_edited_fields({"u0": drawn_u0, "v0": drawn_v0})
+
+    field = exp.field_numpy()
+    assert field[n // 2, n // 2] == pytest.approx(7.0)
+    assert exp.pde.state.step == 0
+
+    # dt_for_velocity defaults to dt_max() inside reset_from_arrays, so
+    # reconstruct velocity using that same dt rather than an arbitrary one.
+    velocity = (exp.pde.u - exp.pde.u_prev) / exp.pde.dt_max()
+    assert np.allclose(velocity[1:-1, 1:-1], 3.0, atol=1e-6)
+
+
 @pytest.mark.skipif(not cuda_is_available(), reason="requires CUDA device")
 def test_cpu_gpu_agreement():
     cpu = _make(n=48, backend_spec=("torch", "cpu", "fp64"))

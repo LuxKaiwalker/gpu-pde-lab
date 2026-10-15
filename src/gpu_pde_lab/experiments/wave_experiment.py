@@ -12,7 +12,7 @@ from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from ..pdes.wave import WaveEquation
 from ..ui.controls import ControlPanel
-from .base import LiveExperiment
+from .base import EditSpec, LiveExperiment
 
 EXPLANATION = r"""
 ### What PDE are we solving?
@@ -113,6 +113,31 @@ class WaveExperiment(LiveExperiment):
 
     def field_numpy(self):
         return self.pde.primary_field_numpy()
+
+    # -- field editor hooks ----------------------------------------------
+
+    def editable_fields(self) -> dict[str, EditSpec]:
+        clip = self.boundary != BoundaryKind.PERIODIC
+        return {
+            "u0": EditSpec(key="u0", label="Initial displacement u(x,y,0)", clip_to_interior=clip),
+            "v0": EditSpec(key="v0", label="Initial velocity du/dt(x,y,0)", clip_to_interior=clip),
+        }
+
+    def edit_field_numpy(self, key: str) -> np.ndarray:
+        if key == "u0":
+            return self.pde.primary_field_numpy()
+        if key == "v0":
+            # No live velocity buffer to seed from (leapfrog has no explicit
+            # velocity state) -- zero is the correct "nothing drawn yet" default.
+            return np.zeros((self.pde.grid.nx, self.pde.grid.ny), dtype=np.float64)
+        raise NotImplementedError(f"WaveExperiment has no editable field {key!r}")
+
+    def apply_edited_fields(self, fields: dict[str, np.ndarray]) -> None:
+        v0 = fields.get("v0")
+        self.pde.reset_from_arrays(fields["u0"], v0 if v0 is not None and np.any(v0) else None)
+
+    def editor_grid(self):
+        return self.pde.grid
 
     def supports_click_injection(self) -> bool:
         return True

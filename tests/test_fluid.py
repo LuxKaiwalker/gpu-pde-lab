@@ -53,3 +53,42 @@ def test_periodic_boundary_does_not_crash():
     for _ in range(30):
         fluid.step(0.01)
     assert np.all(np.isfinite(fluid.dye_numpy()))
+
+
+def test_set_fields_only_touches_provided_slots():
+    fluid = _make()
+    fluid.add_source(0.3, 0.5, fx=1.0, fy=0.5, dye_amount=1.0, radius=0.05)
+    u_before = fluid.backend.to_numpy(fluid.u).copy()
+    v_before = fluid.backend.to_numpy(fluid.v).copy()
+
+    n = fluid.grid.nx
+    new_dye = np.full((n, n), 7.0, dtype=np.float64)
+    fluid.set_fields(dye=new_dye)
+
+    assert np.array_equal(fluid.backend.to_numpy(fluid.u), u_before)
+    assert np.array_equal(fluid.backend.to_numpy(fluid.v), v_before)
+    dye = fluid.dye_numpy()
+    assert np.allclose(dye[1:-1, 1:-1], 7.0)
+    assert fluid.step_count == 0
+    assert fluid.time == 0.0
+
+
+def test_fluid_experiment_editable_fields_apply_round_trip():
+    from gpu_pde_lab.experiments.fluid_experiment import FluidExperiment
+
+    exp = FluidExperiment()
+    exp.backend_name = "CPU"
+    exp.reset()
+
+    specs = exp.editable_fields()
+    assert set(specs) == {"u0", "v0", "dye0"}
+
+    n = exp.n
+    u0 = np.full((n, n), 2.0, dtype=np.float64)
+    v0 = np.full((n, n), -1.0, dtype=np.float64)
+    dye0 = np.full((n, n), 3.0, dtype=np.float64)
+    exp.apply_edited_fields({"u0": u0, "v0": v0, "dye0": dye0})
+
+    assert exp.fluid.step_count == 0
+    dye = exp.fluid.dye_numpy()
+    assert np.allclose(dye[1:-1, 1:-1], 3.0)

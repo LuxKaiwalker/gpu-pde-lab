@@ -86,6 +86,14 @@ class PoissonProblem:
             f += sign * amplitude * np.exp(-(((X - cx * self.grid.lx) ** 2 + (Y - cy * self.grid.ly) ** 2) / (2 * sigma ** 2)))
         self.f = self.backend.array(f)
 
+    def set_rhs_from_array(self, f: np.ndarray) -> None:
+        """Like `set_rhs_gaussian_sources`, but seeded from a user-supplied
+        host array (e.g. hand-drawn in the field editor) instead of randomly
+        placed Gaussian sources. A fresh RHS always restarts the solve from
+        `u=0` with cleared residual history, same as `_build_problem()`."""
+        self.f = self.backend.array(f)
+        self.reset_solution()
+
     def reset_solution(self) -> None:
         self.u = self.backend.zeros(self.grid.shape)
         self.residual_history = []

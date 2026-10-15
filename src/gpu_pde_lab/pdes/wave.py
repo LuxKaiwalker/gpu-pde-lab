@@ -63,6 +63,28 @@ class WaveEquation(PDEModel):
         apply_boundary(self.u_prev, self.boundary)
         self.state.reset()
 
+    def reset_from_arrays(self, u0: np.ndarray, v0: np.ndarray | None = None,
+                           dt_for_velocity: float | None = None) -> None:
+        """Like :meth:`reset`, but seeded from user-supplied host arrays (e.g.
+        hand-drawn in the field editor) instead of an `IC_REGISTRY` name.
+
+        `v0`, if given, is the initial velocity du/dt(x,y,0). Leapfrog has no
+        native velocity state -- it's encoded via the fictitious previous
+        step `u_prev = u0 - dt_for_velocity * v0` (standard first-order
+        leapfrog start-up). `v0=None` reproduces today's implicit
+        zero-velocity behavior exactly (`u_prev = clone(u0)`).
+        """
+        self.u = self.backend.array(u0)
+        if v0 is None:
+            self.u_prev = self.backend.clone(self.u)
+        else:
+            if dt_for_velocity is None:
+                dt_for_velocity = self.dt_max()
+            self.u_prev = self.u - dt_for_velocity * self.backend.array(v0)
+        apply_boundary(self.u, self.boundary)
+        apply_boundary(self.u_prev, self.boundary)
+        self.state.reset()
+
     def dt_max(self) -> float:
         h = min(self.grid.dx, self.grid.dy)
         return h / (self.c * math.sqrt(2.0))

@@ -111,6 +111,23 @@ Run the test suite:
 python -m pytest tests/ -v
 ```
 
+### Editing initial conditions
+
+Heat, Wave, Poisson, and the 2D Fluid simulation each have an **"Edit IC"**
+toggle in the live-page toolbar. Turning it on swaps the heatmap for a
+brush/shape editor over the field(s) that PDE exposes (`u(x,y,0)` for Heat;
+displacement *and* velocity for Wave; the source term `f` for Poisson, not an
+initial guess for `u`; velocity components and dye independently for Fluid —
+never merged into one buffer). Paint with the brush, stamp circles/rects/
+lines, or apply a preset (Gaussian, multiple sources, hot/cold, impulse,
+gradient); `Undo`/`Redo` and `Clear` work per-field. Edits only exist in a
+staged host-side buffer — nothing reaches the live simulation (or the GPU)
+until you click **"Apply edits & Reset"**, so moving the mouse around never
+triggers a device transfer or a reset. **"Save Config..."**/**"Load
+Config..."** persist the edited fields plus grid/boundary metadata to a
+single `.npz` file (plain NumPy arrays + a JSON blob, no pickle) via
+`core/config_io.py`.
+
 ## 4. CUDA requirements
 
 - An NVIDIA GPU with a working driver (checked here against an RTX 2080 Ti,
