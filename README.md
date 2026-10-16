@@ -1,4 +1,4 @@
-# GPU PDE Lab
+# GPU-accelerated PDE Lab
 
 This is a more or less vibecoded platform for GPU-accelerated PDE visualization. It is inspired by the course "solving PDEs on GPUs in parallel" of ETH Zurich.
 
