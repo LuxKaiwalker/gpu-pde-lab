@@ -168,7 +168,12 @@ class PoissonExperiment(LiveExperiment):
 
         panel.add_combo("Method",
                          ["jacobi", "gauss_seidel_redblack", "gauss_seidel_sequential", "conjugate_gradient"],
-                         current=self.method, on_change=set_method)
+                         current=self.method, on_change=set_method,
+                         tooltip="Jacobi: slow but fully parallel. Gauss-Seidel (red-black): "
+                                 "~2x faster convergence, still parallel. Gauss-Seidel "
+                                 "(sequential): fastest convergence per iteration but a "
+                                 "deliberately slow Python loop -- it does not parallelize. "
+                                 "Conjugate gradient: far fewer iterations needed overall.")
 
         def set_grid(text):
             self.n = int(text)

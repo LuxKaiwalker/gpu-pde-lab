@@ -49,7 +49,7 @@ class MemoryExperiment(BenchmarkExperiment):
     def explanation_markdown(self) -> str:
         return EXPLANATION
 
-    def run(self, progress_cb=None) -> dict:
+    def run(self) -> dict:
         sizes = [256, 512, 1024, 2048, 4096]
         backend_cpu = Backend(BackendSpec("torch", "cpu", self.precision if self.precision != "fp16" else "fp32"))
 

@@ -191,19 +191,26 @@ class WaveExperiment(LiveExperiment):
             self.damping = v
 
         panel.add_slider("damping (gamma)", 0.0, 10.0, self.damping, step=0.01, decimals=3,
-                          on_change=set_damping)
+                          on_change=set_damping,
+                          tooltip="0 = undamped (energy stays roughly constant). Higher values "
+                                  "dissipate amplitude over time.")
 
         def set_dt_fraction(v):
             self.dt_fraction = v
 
         panel.add_slider("dt (fraction of CFL dt_max)", 0.01, 3.0, self.dt_fraction, step=0.01,
-                          decimals=3, on_change=set_dt_fraction)
+                          decimals=3, on_change=set_dt_fraction,
+                          tooltip="Timestep as a fraction of the CFL stability bound. 1.0 = "
+                                  "exactly at the limit; above 1.0 is unstable unless 'Allow "
+                                  "unstable dt' is checked.")
 
         def set_unstable(checked):
             self.allow_unstable = checked
 
         panel.add_checkbox("Allow unstable dt (explore instability)", self.allow_unstable,
-                            on_change=set_unstable)
+                            on_change=set_unstable,
+                            tooltip="When off, dt is clamped to the CFL bound. When on, you can "
+                                    "push past it and watch the amplitude grow without bound.")
 
         def set_grid(text):
             self.n = int(text)

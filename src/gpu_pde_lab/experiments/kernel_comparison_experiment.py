@@ -50,7 +50,7 @@ class KernelComparisonExperiment(BenchmarkExperiment):
     def explanation_markdown(self) -> str:
         return EXPLANATION
 
-    def run(self, progress_cb=None) -> dict:
+    def run(self) -> dict:
         results = run_kernel_comparison(self.n, include_python_loop=self.include_loop, n_calls=5)
         rows = ["| Method | ms/call | Mcells/s | max diff vs reference |", "|---|---|---|---|"]
         for r in results:

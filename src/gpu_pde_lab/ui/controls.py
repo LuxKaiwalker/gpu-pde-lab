@@ -110,31 +110,46 @@ class ControlPanel(QWidget):
 
     def add_slider(self, label: str, minimum: float, maximum: float, value: float,
                     step: float = 0.001, decimals: int = 4, log_scale: bool = False,
-                    on_change: Callable[[float], None] | None = None) -> FloatSlider:
+                    on_change: Callable[[float], None] | None = None,
+                    tooltip: str | None = None) -> FloatSlider:
         w = FloatSlider(minimum, maximum, value, step, decimals, log_scale)
         if on_change:
             w.valueChanged.connect(on_change)
-        self._form.addRow(QLabel(label), w)
+        label_widget = QLabel(label)
+        if tooltip:
+            label_widget.setToolTip(tooltip)
+            w.setToolTip(tooltip)
+        self._form.addRow(label_widget, w)
         return w
 
     def add_combo(self, label: str, options: list[str], current: str | None = None,
-                   on_change: Callable[[str], None] | None = None) -> QComboBox:
+                   on_change: Callable[[str], None] | None = None,
+                   tooltip: str | None = None) -> QComboBox:
         w = QComboBox()
         w.addItems(options)
         if current is not None and current in options:
             w.setCurrentText(current)
         if on_change:
             w.currentTextChanged.connect(on_change)
-        self._form.addRow(QLabel(label), w)
+        label_widget = QLabel(label)
+        if tooltip:
+            label_widget.setToolTip(tooltip)
+            w.setToolTip(tooltip)
+        self._form.addRow(label_widget, w)
         return w
 
     def add_checkbox(self, label: str, checked: bool = False,
-                      on_change: Callable[[bool], None] | None = None) -> QCheckBox:
+                      on_change: Callable[[bool], None] | None = None,
+                      tooltip: str | None = None) -> QCheckBox:
         w = QCheckBox()
         w.setChecked(checked)
         if on_change:
             w.toggled.connect(on_change)
-        self._form.addRow(QLabel(label), w)
+        label_widget = QLabel(label)
+        if tooltip:
+            label_widget.setToolTip(tooltip)
+            w.setToolTip(tooltip)
+        self._form.addRow(label_widget, w)
         return w
 
     def add_radio_group(self, label: str, options: list[str], current: str,

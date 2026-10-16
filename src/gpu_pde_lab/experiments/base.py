@@ -91,6 +91,25 @@ class LiveExperiment(Experiment):
         """Optional secondary plot data (e.g. residual-vs-iteration curve)."""
         return None
 
+    # -- 3D volume hooks (optional) ----------------------------------------
+    #
+    # Default implementations mean a 2D experiment is completely unaffected:
+    # `main_window.py` only swaps in the 3-orthogonal-slice viewer
+    # (`ui/viz/slice_viewer_3d.py`) when `is_3d()` is True.
+
+    def is_3d(self) -> bool:
+        return False
+
+    def volume_numpy(self) -> np.ndarray | None:
+        """The full (nx, ny, nz) host array to display via the 3D slice
+        viewer. Only needs overriding when `is_3d()` is True."""
+        return None
+
+    def volume_grid(self):
+        """The `Grid3D` behind `volume_numpy()`. Only needs overriding when
+        `is_3d()` is True."""
+        return None
+
     # -- initial-condition / source-field editor hooks (optional) ---------
     #
     # Default implementations mean an experiment that doesn't override
@@ -125,6 +144,5 @@ class BenchmarkExperiment(Experiment):
     kind = "benchmark"
 
     @abstractmethod
-    def run(self, progress_cb=None) -> dict[str, Any]:
-        """Execute the benchmark/analysis and return plot-ready result data.
-        ``progress_cb``, if given, may be called with a 0..1 float."""
+    def run(self) -> dict[str, Any]:
+        """Execute the benchmark/analysis and return plot-ready result data."""

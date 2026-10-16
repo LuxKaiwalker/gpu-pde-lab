@@ -50,7 +50,7 @@ class CpuGpuExperiment(BenchmarkExperiment):
     def explanation_markdown(self) -> str:
         return EXPLANATION
 
-    def run(self, progress_cb=None) -> dict:
+    def run(self) -> dict:
         if not cuda_is_available():
             return {"summary": "No CUDA device available -- cannot run CPU vs GPU comparison.",
                      "line_plots": []}

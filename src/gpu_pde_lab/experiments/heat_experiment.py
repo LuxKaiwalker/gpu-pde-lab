@@ -206,13 +206,19 @@ class HeatExperiment(LiveExperiment):
             self.dt_fraction = v
 
         panel.add_slider("dt (fraction of dt_max)", 0.01, 3.0, self.dt_fraction, step=0.01,
-                          decimals=3, on_change=set_dt_fraction)
+                          decimals=3, on_change=set_dt_fraction,
+                          tooltip="Timestep as a fraction of the stability bound dt_max. "
+                                  "1.0 = exactly at the limit; above 1.0 is unstable unless "
+                                  "'Allow unstable dt' is checked.")
 
         def set_unstable(checked):
             self.allow_unstable = checked
 
         panel.add_checkbox("Allow unstable dt (explore instability)", self.allow_unstable,
-                            on_change=set_unstable)
+                            on_change=set_unstable,
+                            tooltip="When off, dt is clamped to dt_max even if the slider above "
+                                    "is set higher. When on, you can push past the stability "
+                                    "bound and watch the simulation diverge.")
 
         def set_grid(text):
             self.n = int(text)
@@ -226,7 +232,10 @@ class HeatExperiment(LiveExperiment):
             on_change()
 
         panel.add_combo("Boundary condition", ["dirichlet", "neumann", "periodic"],
-                         current=self.boundary.value, on_change=set_boundary)
+                         current=self.boundary.value, on_change=set_boundary,
+                         tooltip="Dirichlet: edges held at a fixed value. Neumann: insulated "
+                                 "(no heat flux through the walls). Periodic: edges wrap around, "
+                                 "no walls at all.")
 
         def set_ic(text):
             self.ic = text

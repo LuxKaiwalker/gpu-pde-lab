@@ -48,7 +48,7 @@ class ConvergenceExperiment(BenchmarkExperiment):
     def explanation_markdown(self) -> str:
         return EXPLANATION
 
-    def run(self, progress_cb=None) -> dict:
+    def run(self) -> dict:
         if self.mode == "spatial":
             sizes = [16, 32, 64, 128, 256]
             result = spatial_convergence(sizes, alpha=self.alpha, t_final=0.01)

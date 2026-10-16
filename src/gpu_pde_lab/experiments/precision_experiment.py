@@ -62,7 +62,7 @@ class PrecisionExperiment(BenchmarkExperiment):
         finite = bool(np.all(np.isfinite(heat.primary_field_numpy())))
         return heat.primary_field_numpy(), t.elapsed_seconds, mem, finite
 
-    def run(self, progress_cb=None) -> dict:
+    def run(self) -> dict:
         grid = Grid2D(nx=self.n, ny=self.n)
         ref_backend = Backend(BackendSpec("torch", "cpu", "fp64"))
         dt = HeatEquation(grid, ref_backend, BoundaryKind.NEUMANN, alpha=self.alpha).dt_max() * 0.5

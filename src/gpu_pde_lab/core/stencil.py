@@ -47,8 +47,12 @@ def laplacian(u, dx: float, dy: float, boundary: BoundaryKind):
 
     # Non-periodic: compute only on the interior via slicing; pad the result
     # with zeros on the boundary ring since those values get overwritten by
-    # apply_boundary() immediately afterwards anyway.
-    lap = u * 0.0
+    # apply_boundary() immediately afterwards anyway. `_zeros_like(u)` (a
+    # pure allocate-and-fill) is used here rather than `u * 0.0`, which would
+    # read the entire array just to discard it -- doubling the bandwidth of
+    # what should be a cheap zero-fill, in the hottest path in the codebase
+    # (every heat/wave/Poisson step funnels through this function).
+    lap = _zeros_like(u)
     center = u[1:-1, 1:-1]
     north = u[:-2, 1:-1]
     south = u[2:, 1:-1]
@@ -56,6 +60,56 @@ def laplacian(u, dx: float, dy: float, boundary: BoundaryKind):
     east = u[1:-1, 2:]
     lap[1:-1, 1:-1] = (north + south - 2 * center) / (dx * dx) + (east + west - 2 * center) / (dy * dy)
     return lap
+
+
+def laplacian_3d(u, dx: float, dy: float, dz: float, boundary: BoundaryKind):
+    """3D analog of :func:`laplacian`: the 7-point stencil (center + 6 face
+    neighbors) instead of the 5-point one (center + 4 edge neighbors).
+
+    Same shifted-slice (not Python loop) approach, same boundary convention:
+    non-periodic boundaries compute only the interior and leave the
+    1-cell-thick face ring at zero (the caller re-applies the boundary
+    condition via :func:`gpu_pde_lab.core.boundary.apply_boundary_3d`
+    immediately afterward); periodic boundaries wrap on all 3 axes.
+    """
+    if boundary == BoundaryKind.PERIODIC:
+        up = roll(u, -1, axis=0)
+        down = roll(u, 1, axis=0)
+        west = roll(u, 1, axis=1)
+        east = roll(u, -1, axis=1)
+        back = roll(u, 1, axis=2)
+        front = roll(u, -1, axis=2)
+        lap = ((up - 2 * u + down) / (dx * dx) + (west - 2 * u + east) / (dy * dy)
+               + (back - 2 * u + front) / (dz * dz))
+        return lap
+
+    lap = _zeros_like(u)
+    center = u[1:-1, 1:-1, 1:-1]
+    north = u[:-2, 1:-1, 1:-1]
+    south = u[2:, 1:-1, 1:-1]
+    west = u[1:-1, :-2, 1:-1]
+    east = u[1:-1, 2:, 1:-1]
+    down = u[1:-1, 1:-1, :-2]
+    up = u[1:-1, 1:-1, 2:]
+    lap[1:-1, 1:-1, 1:-1] = (
+        (north + south - 2 * center) / (dx * dx)
+        + (east + west - 2 * center) / (dy * dy)
+        + (up + down - 2 * center) / (dz * dz)
+    )
+    return lap
+
+
+def _zeros_like(u):
+    """Backend-agnostic zeros-with-same-shape/dtype/device, without reading
+    `u`'s contents -- unlike `u * 0.0`, which touches the full array."""
+    mod = type(u).__module__
+    if mod.startswith("torch"):
+        import torch
+
+        return torch.zeros_like(u)
+    import numpy as np
+
+    return np.zeros_like(u)
 
 
 def roll(u, shift: int, axis: int):

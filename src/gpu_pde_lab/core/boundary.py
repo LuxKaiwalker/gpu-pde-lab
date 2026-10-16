@@ -50,3 +50,35 @@ def apply_boundary(u, kind: BoundaryKind, dirichlet_value: float = 0.0):
         return u
 
     raise ValueError(f"Unknown boundary kind: {kind}")
+
+
+def apply_boundary_3d(u, kind: BoundaryKind, dirichlet_value: float = 0.0):
+    """3D analog of :func:`apply_boundary`: same per-face convention, just
+    one face-assignment per one of the 6 faces of the box instead of 4 edges
+    of a square. Edges/corners get written by more than one face assignment,
+    which is safe -- all of them agree on the same rule (fixed value, or
+    "same as first interior neighbor"), exactly as the 2D version already
+    relies on implicitly at its own 1D edges.
+    """
+    if kind == BoundaryKind.PERIODIC:
+        return u
+
+    if kind == BoundaryKind.DIRICHLET:
+        u[0, :, :] = dirichlet_value
+        u[-1, :, :] = dirichlet_value
+        u[:, 0, :] = dirichlet_value
+        u[:, -1, :] = dirichlet_value
+        u[:, :, 0] = dirichlet_value
+        u[:, :, -1] = dirichlet_value
+        return u
+
+    if kind == BoundaryKind.NEUMANN:
+        u[0, :, :] = u[1, :, :]
+        u[-1, :, :] = u[-2, :, :]
+        u[:, 0, :] = u[:, 1, :]
+        u[:, -1, :] = u[:, -2, :]
+        u[:, :, 0] = u[:, :, 1]
+        u[:, :, -1] = u[:, :, -2]
+        return u
+
+    raise ValueError(f"Unknown boundary kind: {kind}")

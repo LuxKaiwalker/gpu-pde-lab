@@ -20,16 +20,19 @@ pre-built PDE/CFD solver.
 
 ## 1. What's in here
 
-Ten interactive experiments, selectable from a dropdown in a single desktop
-app:
+Twelve interactive experiments, grouped into three categories in the
+experiment dropdown (PDE Simulations / GPU Experiments / Numerical Analysis)
+in a single desktop app. A header bar at the top always shows which GPU (or
+"CPU only") is active, regardless of which experiment is selected:
 
 | Experiment | Kind | What it teaches |
 |---|---|---|
 | Heat Equation (+ Stability) | live | explicit FTCS diffusion; CFL-style stability bound; deliberate instability |
+| **3D Heat Equation** | live | the same scheme generalized to a 7-point stencil on a `Grid3D`, inspected via three movable orthogonal slices |
 | Wave Equation | live | leapfrog time integration; damping; a different (linear, not quadratic) CFL bound |
 | Poisson Equation (Iterative Solvers) | live | elliptic PDEs as `Au=b`; Jacobi vs Gauss-Seidel vs Conjugate Gradient |
-| Stencil Visualization | live | the 5-point stencil, cell-by-cell, mapped onto "one GPU thread per cell" |
 | 2D Fluid Simulation | live | operator-split incompressible Navier-Stokes (Stam's Stable Fluids) |
+| Stencil Visualization | live | the 5-point stencil, cell-by-cell, mapped onto "one GPU thread per cell" |
 | CPU vs GPU Benchmark | benchmark | where GPU parallelism pays off (and where it doesn't) |
 | Host ↔ Device Transfer | benchmark | why PCIe round-trips dominate wall time at small/medium problem sizes |
 | GPU Memory | benchmark | why "just one small array" becomes real memory pressure with multiple buffers |
@@ -40,6 +43,15 @@ app:
 Every experiment ships with an explanation panel answering: *what PDE is
 this, how is it discretized, what does one grid cell compute, why can it run
 in parallel, what does the GPU actually do, and what can go wrong.*
+
+**3D is Heat-only, by design.** `3D Heat Equation` is a complete, real
+vertical slice (`core/grid.py`'s `Grid3D`, `core/stencil.py`'s `laplacian_3d`,
+`pdes/heat_3d.py`, `ui/viz/slice_viewer_3d.py`) — not a placeholder. Wave,
+Poisson, and Fluid have no 3D solver yet; extending each would need its own
+numerical work (a 3D CFL bound for Wave, a 3D Poisson operator, 3D
+semi-Lagrangian advection + trilinear interpolation for Fluid) rather than
+reusing this one. Find it at: **Experiment dropdown → PDE Simulations → 3D
+Heat Equation**.
 
 ## 2. Installation
 
@@ -73,10 +85,11 @@ The flake's `devShell`:
   license tag.
 
 First entry into the shell installs the remaining Python dependencies into
-the venv:
+the venv (PySide6 itself comes from the nix-provided system site-packages
+above, not pip, so it's intentionally left out of this line):
 
 ```bash
-pip install torch numpy scipy pyqtgraph pytest matplotlib pyopengl
+pip install torch numpy pyqtgraph pytest matplotlib
 pip install -e .
 ```
 
@@ -84,9 +97,10 @@ pip install -e .
 
 ### Other platforms
 
-Any Python 3.11+ environment with PyTorch (CUDA build optional — the app
-runs on CPU-only if no GPU is present, it just won't have a CUDA backend to
-compare against), NumPy, SciPy, PySide6, and pyqtgraph installed will work:
+Any Python 3.11+ environment works — `pip install -e .` pulls in NumPy,
+PyTorch (CUDA build optional; the app runs CPU-only if no GPU is present, it
+just won't have a CUDA backend to compare against), PySide6, and pyqtgraph
+automatically via `pyproject.toml`:
 
 ```bash
 pip install -e .
@@ -145,17 +159,22 @@ single `.npz` file (plain NumPy arrays + a JSON blob, no pickle) via
 
 ```
 src/gpu_pde_lab/
-  core/            grid, field, backend (NumPy / Torch-CPU / Torch-CUDA), boundary conditions,
-                   the shared 5-point stencil, bilinear interpolation (for advection)
-  pdes/            HeatEquation, WaveEquation, PoissonProblem, StableFluids2D --
+  core/            grid (Grid2D + Grid3D), field, backend (NumPy / Torch-CPU / Torch-CUDA),
+                   boundary conditions (2D and 3D), the shared 5-point and 7-point stencils,
+                   bilinear interpolation (for advection),
+                   field_edit.py (brush/stamp primitives + undo/redo for the IC editor),
+                   config_io.py (save/load for edited fields + PDE params, no pickle)
+  pdes/            HeatEquation, HeatEquation3D, WaveEquation, PoissonProblem, StableFluids2D --
                    each owns its own state and a step()/iteration method
-  initial_conditions.py   point/Gaussian/multi-source/hot-cold generators, shared across PDEs
+  initial_conditions.py   point/Gaussian/multi-source/hot-cold/gradient generators, shared across PDEs
   benchmarking/    CUDA-safe timing, memory estimation/accounting, bandwidth estimation,
                    CPU-vs-GPU sweep, transfer breakdown, kernel comparison, convergence study
   experiments/     thin UI-facing wrappers: own parameter state + controls + explanation text,
                    delegate all actual numerics to core/ and pdes/
   ui/              PySide6 main window, reusable control widgets, pyqtgraph-based
-                   heatmap/line-plot/bar-chart views -- no numerics live here
+                   heatmap/line-plot/bar-chart views, the interactive field_editor_widget,
+                   slice_viewer_3d (three orthogonal slices + shared color scale) --
+                   no numerics live here
   app.py           wires experiments into the main window and starts the Qt event loop
 scripts/run_benchmark.py   headless CLI benchmark entry point
 tests/             numerical correctness, backend agreement, and solver/viz-separation regression tests
@@ -302,3 +321,24 @@ should need to change.
   domains, where a spectral treatment would more conventionally use
   `lx/nx`. This is a deliberate simplification; it does not affect any of
   the qualitative or convergence-order results above.
+- The field editor's velocity-arrow overlay (`ui/viz/vector_overlay.py`) has
+  a tested downsampling helper but isn't wired into the Fluid experiment's
+  view yet -- velocity is still only inspectable via the scalar "velocity
+  magnitude" display mode.
+- "Save Config"/"Load Config" round-trip the edited fields plus grid
+  dimensions and boundary condition, but not PDE-specific scalar parameters
+  (`alpha`, `c`, `damping`, `viscosity`, `dt`, backend/precision) -- loading
+  a config applies it on top of whatever those are currently set to in the
+  UI, not whatever they were when the config was saved.
+- 3D support covers Heat only (see §1) -- Wave/Poisson/Fluid remain 2D.
+- Explanation panels render their Markdown via `QTextBrowser`, which has no
+  LaTeX support: `$$ \nabla^2 u = ... $$` is shown as literal text rather
+  than typeset math. A real fix (e.g. rendering via matplotlib's mathtext to
+  inline images) is a worthwhile follow-up, not done here.
+- Benchmark progress is binary ("Running..." / "Done.") with no intermediate
+  progress indicator -- acceptable since these benchmarks run in seconds,
+  but worth revisiting if a slower one is added later.
+
+## 12. License
+
+MIT -- see [`LICENSE`](LICENSE).

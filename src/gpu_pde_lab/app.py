@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from .experiments.convergence_experiment import ConvergenceExperiment
 from .experiments.cpu_gpu_experiment import CpuGpuExperiment
+from .experiments.heat_3d_experiment import Heat3DExperiment
 from .experiments.heat_experiment import HeatExperiment
 from .experiments.kernel_comparison_experiment import KernelComparisonExperiment
 from .experiments.memory_experiment import MemoryExperiment
@@ -29,6 +30,7 @@ except ImportError:
 def build_live_factories() -> dict:
     factories = {
         "Heat Equation (+ Stability)": HeatExperiment,
+        "3D Heat Equation": Heat3DExperiment,
         "Wave Equation": WaveExperiment,
         "Poisson Equation (Iterative Solvers)": PoissonExperiment,
         "Stencil Visualization": StencilExperiment,
