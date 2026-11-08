@@ -98,8 +98,8 @@ class StencilExperiment(LiveExperiment):
         return True
 
     def on_click(self, x_frac: float, y_frac: float) -> None:
-        i = int(round(x_frac * (self.n - 1)))
-        j = int(round(y_frac * (self.n - 1)))
+        i = round(x_frac * (self.n - 1))
+        j = round(y_frac * (self.n - 1))
         i = max(0, min(self.n - 1, i))
         j = max(0, min(self.n - 1, j))
         self.selected_cell = (i, j)

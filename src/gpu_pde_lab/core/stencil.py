@@ -47,12 +47,12 @@ def laplacian(u, dx: float, dy: float, boundary: BoundaryKind):
 
     # Non-periodic: compute only on the interior via slicing; pad the result
     # with zeros on the boundary ring since those values get overwritten by
-    # apply_boundary() immediately afterwards anyway. `_zeros_like(u)` (a
+    # apply_boundary() immediately afterwards anyway. `zeros_like(u)` (a
     # pure allocate-and-fill) is used here rather than `u * 0.0`, which would
     # read the entire array just to discard it -- doubling the bandwidth of
     # what should be a cheap zero-fill, in the hottest path in the codebase
     # (every heat/wave/Poisson step funnels through this function).
-    lap = _zeros_like(u)
+    lap = zeros_like(u)
     center = u[1:-1, 1:-1]
     north = u[:-2, 1:-1]
     south = u[2:, 1:-1]
@@ -83,7 +83,7 @@ def laplacian_3d(u, dx: float, dy: float, dz: float, boundary: BoundaryKind):
                + (back - 2 * u + front) / (dz * dz))
         return lap
 
-    lap = _zeros_like(u)
+    lap = zeros_like(u)
     center = u[1:-1, 1:-1, 1:-1]
     north = u[:-2, 1:-1, 1:-1]
     south = u[2:, 1:-1, 1:-1]
@@ -99,9 +99,12 @@ def laplacian_3d(u, dx: float, dy: float, dz: float, boundary: BoundaryKind):
     return lap
 
 
-def _zeros_like(u):
+def zeros_like(u):
     """Backend-agnostic zeros-with-same-shape/dtype/device, without reading
-    `u`'s contents -- unlike `u * 0.0`, which touches the full array."""
+    `u`'s contents -- unlike `u * 0.0`, which touches the full array.
+
+    Public because the Poisson/fluid iterative solvers need the same thing in
+    their own hot paths; see `pdes/poisson.py`'s `jacobi_step`."""
     mod = type(u).__module__
     if mod.startswith("torch"):
         import torch

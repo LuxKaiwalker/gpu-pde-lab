@@ -1,22 +1,27 @@
-"""Five implementations of the same 5-point Laplacian, compared head to head.
+"""Four implementations of the same 5-point Laplacian, compared head to head.
 
-This is the clearest illustration in the whole project of why "GPU vs CPU"
-is really "massively parallel vs serial", not a property of hardware alone:
+This is the clearest illustration in the project of why "GPU vs CPU" is
+really "massively parallel vs serial", not a property of hardware alone:
 
 1. Pure Python double loop      -- one Python-level scalar op per cell, serial.
 2. NumPy vectorized slicing     -- same math, but dispatched as bulk C loops
                                     over contiguous memory (SIMD-friendly).
 3. PyTorch CPU tensor ops       -- same vectorized slicing, through PyTorch's
                                     CPU tensor backend (multi-threaded internally).
-4. PyTorch CUDA tensor ops      -- same vectorized slicing, dispatched as a
-                                    CUDA kernel launch running thousands of
+4. PyTorch CUDA tensor ops      -- same vectorized slicing, dispatched as
+                                    CUDA kernel launches running thousands of
                                     GPU threads concurrently.
-5. (optional) custom CUDA kernel via torch.compile, included only if it
-   demonstrates something the built-in vectorized op doesn't.
 
 The Python-loop implementation is capped to small grids by the caller --
 at anything beyond ~128x128 it would take minutes per step, which is itself
 the point: interpreted, scalar, serial execution does not scale.
+
+This module stops at "the same algorithm on different execution engines". The
+question it raises but cannot answer -- *given* the GPU, how much of it is
+that fourth implementation actually using -- is what
+:mod:`gpu_pde_lab.kernels` and :mod:`gpu_pde_lab.benchmarking.roofline`
+exist for. The short version measured there: implementation 4 reaches about
+7% of this card's achievable bandwidth, and a fused kernel reaches 93%.
 """
 
 from __future__ import annotations
@@ -31,7 +36,9 @@ from .timer import timed
 try:
     import torch
 except ImportError:  # pragma: no cover
-    torch = None
+    # Typed as Any so the None fallback is assignable; the module is optional
+    # at import time and every use is guarded.
+    torch = None  # type: ignore[assignment]
 
 
 def laplacian_python_loop(u: np.ndarray, dx: float, dy: float) -> np.ndarray:

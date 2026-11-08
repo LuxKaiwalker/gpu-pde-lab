@@ -3,4 +3,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
-*.png
+
+# NOTE: *.png is deliberately NOT ignored. This is a visualization
+# project; the figures under docs/ are its primary evidence and have to
+# be in the repository to do any work.

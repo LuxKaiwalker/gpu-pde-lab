@@ -1,3 +1,5 @@
+import itertools
+
 from gpu_pde_lab.benchmarking.convergence import spatial_convergence, temporal_convergence
 
 
@@ -12,7 +14,7 @@ def test_spatial_convergence_is_approximately_second_order():
 def test_spatial_error_shrinks_monotonically_with_h():
     result = spatial_convergence(sizes=[16, 32, 64, 128], t_final=0.01)
     errors = [p.error_linf for p in result.points]
-    assert all(e2 < e1 for e1, e2 in zip(errors, errors[1:]))
+    assert all(e2 < e1 for e1, e2 in itertools.pairwise(errors))
 
 
 def test_temporal_convergence_shrinks_before_hitting_spatial_floor():

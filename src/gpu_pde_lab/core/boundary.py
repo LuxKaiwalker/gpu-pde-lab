@@ -17,7 +17,11 @@ from __future__ import annotations
 from enum import Enum
 
 
-class BoundaryKind(str, Enum):
+# Not `StrEnum`: `config_io` persists these values into saved .npz configs,
+# and str+Enum is what those existing files were written against. The
+# formatting difference between the two is small but it is a file-format
+# change, so it is not worth making for a lint rule.
+class BoundaryKind(str, Enum):  # noqa: UP042
     DIRICHLET = "dirichlet"
     NEUMANN = "neumann"
     PERIODIC = "periodic"

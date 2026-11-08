@@ -65,7 +65,9 @@ def save_config(path: str | Path, config: ExperimentConfig) -> None:
         key: np.asarray(arr, dtype=np.float32) for key, arr in config.fields.items()
     }
     arrays[META_KEY] = np.frombuffer(meta_bytes, dtype=np.uint8)
-    np.savez(path, **arrays)
+    # numpy's savez stub declares its second positional as `bool`, which a
+    # **kwargs splat of arrays trips over. The call itself is correct.
+    np.savez(path, **arrays)  # type: ignore[arg-type]
 
 
 def load_config(path: str | Path) -> ExperimentConfig:
@@ -79,7 +81,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
 
     try:
         npz = np.load(p, allow_pickle=False)
-    except Exception as exc:  # noqa: BLE001 - any load failure is a validation failure here
+    except Exception as exc:
         raise ConfigValidationError(f"Could not read {path!r} as a config file: {exc}") from exc
 
     try:

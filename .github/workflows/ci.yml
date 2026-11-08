@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests (python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch: the CUDA wheels are ~2.5 GB and no GitHub-hosted
+          # runner has a GPU to use them with. Tests that need a device skip
+          # themselves through cuda_is_usable(), so this exercises every
+          # numerical path that does not require one.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        env:
+          # No display on the runner; the Qt widget tests need a platform
+          # plugin that does not open one. conftest.py sets this too, but
+          # setting it here covers anything imported before conftest runs.
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -q
+
+  lint:
+    name: ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: ruff
+        run: ruff check src tests scripts
+
+      - name: ruff format check
+        run: ruff format --check --diff src tests scripts
+        continue-on-error: true
+
+      - name: mypy
+        run: mypy

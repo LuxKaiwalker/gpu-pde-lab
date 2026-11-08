@@ -70,4 +70,4 @@ class Stopwatch:
         self._t_last = now
 
     def total_seconds(self) -> float:
-        return sum(l.seconds for l in self.laps)
+        return sum(lap.seconds for lap in self.laps)

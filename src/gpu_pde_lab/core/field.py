@@ -20,22 +20,22 @@ class Field:
     data: Any
 
     @classmethod
-    def zeros(cls, name: str, grid: Grid2D, backend: Backend) -> "Field":
+    def zeros(cls, name: str, grid: Grid2D, backend: Backend) -> Field:
         return cls(name=name, grid=grid, backend=backend, data=backend.zeros(grid.shape))
 
     @classmethod
-    def from_numpy(cls, name: str, grid: Grid2D, backend: Backend, array) -> "Field":
+    def from_numpy(cls, name: str, grid: Grid2D, backend: Backend, array) -> Field:
         return cls(name=name, grid=grid, backend=backend, data=backend.array(array))
 
     def numpy(self):
         """Host-side float64 copy, suitable for plotting or saving."""
         return self.backend.to_numpy(self.data)
 
-    def clone(self) -> "Field":
+    def clone(self) -> Field:
         return Field(self.name, self.grid, self.backend, self.backend.clone(self.data))
 
     def nbytes(self) -> int:
         return self.grid.num_cells * self.backend.bytes_per_element()
 
-    def to_backend(self, other_backend: Backend) -> "Field":
+    def to_backend(self, other_backend: Backend) -> Field:
         return Field(self.name, self.grid, other_backend, self.backend.to_device(self.data, other_backend))

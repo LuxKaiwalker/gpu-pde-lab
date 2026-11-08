@@ -15,8 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from gpu_pde_lab.benchmarking.suite import run_cpu_gpu_sweep  # noqa: E402
-from gpu_pde_lab.core.backend import cuda_is_available  # noqa: E402
+from gpu_pde_lab.benchmarking.suite import run_cpu_gpu_sweep
+from gpu_pde_lab.core.backend import cuda_free_memory_bytes, cuda_is_usable
 
 
 def main() -> int:
@@ -27,8 +27,20 @@ def main() -> int:
     parser.add_argument("--out", type=str, default=None, help="optional PNG path for T(N)/speedup plots")
     args = parser.parse_args()
 
-    if not cuda_is_available():
-        print("No CUDA device detected -- this script compares CPU vs GPU, so it has nothing to do.")
+    if not cuda_is_usable():
+        free = cuda_free_memory_bytes()
+        if free is not None:
+            print(
+                f"A CUDA device is present but only {free / 1024 ** 2:.0f} MB is free "
+                "-- not enough to benchmark against. Free the device and retry.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "No usable CUDA device -- this script compares CPU vs GPU, so it has "
+                "nothing to do.",
+                file=sys.stderr,
+            )
         return 1
 
     print(f"Running CPU vs GPU heat-equation benchmark: sizes={args.sizes}, "
@@ -39,7 +51,7 @@ def main() -> int:
     header = f"{'N':>6} {'CPU ms/step':>12} {'GPU ms/step':>12} {'Speedup':>9} {'GPU GB/s':>10} {'GPU MB':>8}"
     print(header)
     print("-" * len(header))
-    for n, c, g, s in zip(result.sizes, result.cpu, result.gpu, result.speedups()):
+    for n, c, g, s in zip(result.sizes, result.cpu, result.gpu, result.speedups(), strict=False):
         print(f"{n:>6} {c.seconds_per_step*1e3:>12.3f} {g.seconds_per_step*1e3:>12.3f} "
               f"{s:>8.1f}x {g.bandwidth_gb_s:>10.1f} {g.gpu_memory_mb:>8.2f}")
 
@@ -48,7 +60,7 @@ def main() -> int:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
-        fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+        _fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
         cpu_ms = [r.seconds_per_step * 1e3 for r in result.cpu]
         gpu_ms = [r.seconds_per_step * 1e3 for r in result.gpu]
         axes[0].loglog(result.sizes, cpu_ms, "o-", label="CPU")

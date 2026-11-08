@@ -23,20 +23,20 @@ def test_switching_experiments_hides_the_previous_controls_widget():
     from gpu_pde_lab.app import build_benchmark_factories, build_live_factories
     from gpu_pde_lab.ui.main_window import MainWindow
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     win = MainWindow(build_live_factories(), build_benchmark_factories())
     win.show()
-    app.processEvents()
+    _app.processEvents()
     first_index, second_index = _first_two_selectable_indices(win)
 
     win.select_experiment(first_index)
-    app.processEvents()
+    _app.processEvents()
     first_widget = win.current_controls_widget
     assert first_widget is not None
     assert first_widget.isVisible()
 
     win.select_experiment(second_index)
-    app.processEvents()
+    _app.processEvents()
 
     assert not first_widget.isVisible(), (
         "the outgoing experiment's control panel must be hidden, not left "
@@ -51,17 +51,17 @@ def test_reselecting_the_same_experiment_does_not_leave_a_stale_duplicate():
     from gpu_pde_lab.app import build_benchmark_factories, build_live_factories
     from gpu_pde_lab.ui.main_window import MainWindow
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     win = MainWindow(build_live_factories(), build_benchmark_factories())
     win.show()
-    app.processEvents()
+    _app.processEvents()
     first_index, _ = _first_two_selectable_indices(win)
 
     win.select_experiment(first_index)
     first_widget = win.current_controls_widget
 
     win.select_experiment(first_index)  # re-select the same experiment
-    app.processEvents()
+    _app.processEvents()
 
     assert not first_widget.isVisible()
     assert win.current_controls_widget.isVisible()
@@ -71,10 +71,10 @@ def test_category_header_rows_are_disabled_and_unselectable():
     from gpu_pde_lab.app import build_benchmark_factories, build_live_factories
     from gpu_pde_lab.ui.main_window import MainWindow
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     win = MainWindow(build_live_factories(), build_benchmark_factories())
     win.show()
-    app.processEvents()
+    _app.processEvents()
 
     header_indices = [i for i, entry in enumerate(win._combo_entries) if entry is None]
     assert header_indices, "expected at least one category header row"
@@ -94,7 +94,7 @@ def test_every_registered_experiment_is_reachable_through_the_combo():
     from gpu_pde_lab.app import build_benchmark_factories, build_live_factories
     from gpu_pde_lab.ui.main_window import MainWindow
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     win = MainWindow(build_live_factories(), build_benchmark_factories())
 
     live_names = {("live", n) for n in build_live_factories()}

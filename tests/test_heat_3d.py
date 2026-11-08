@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from gpu_pde_lab.core.backend import Backend, BackendSpec, cuda_is_available
+from gpu_pde_lab.core.backend import Backend, BackendSpec, cuda_is_usable
 from gpu_pde_lab.core.boundary import BoundaryKind
 from gpu_pde_lab.core.grid import Grid3D
 from gpu_pde_lab.pdes.heat_3d import HeatEquation3D
@@ -74,7 +74,7 @@ def test_dirichlet_zero_boundary_stays_zero():
     assert np.allclose(field[:, :, -1], 0.0)
 
 
-@pytest.mark.skipif(not cuda_is_available(), reason="requires CUDA device")
+@pytest.mark.skipif(not cuda_is_usable(), reason="requires CUDA device")
 def test_cpu_gpu_agreement():
     cpu = _make(n=16, backend_spec=("torch", "cpu", "fp64"))
     gpu = _make(n=16, backend_spec=("torch", "cuda", "fp64"))

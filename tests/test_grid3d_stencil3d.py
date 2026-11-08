@@ -4,7 +4,7 @@ Grid3D geometry, the 7-point Laplacian, and apply_boundary_3d."""
 import numpy as np
 import pytest
 
-from gpu_pde_lab.core.backend import Backend, BackendSpec, cuda_is_available
+from gpu_pde_lab.core.backend import Backend, BackendSpec, cuda_is_usable
 from gpu_pde_lab.core.boundary import BoundaryKind, apply_boundary_3d
 from gpu_pde_lab.core.grid import Grid3D
 from gpu_pde_lab.core.stencil import laplacian_3d
@@ -55,7 +55,6 @@ def test_laplacian_3d_periodic_matches_nonperiodic_in_interior():
 
 
 def test_laplacian_3d_torch_matches_numpy():
-    import torch
 
     n = 10
     rng = np.random.default_rng(1)
@@ -104,7 +103,7 @@ def test_apply_boundary_3d_periodic_is_a_no_op():
     assert np.array_equal(u, original)
 
 
-@pytest.mark.skipif(not cuda_is_available(), reason="requires CUDA device")
+@pytest.mark.skipif(not cuda_is_usable(), reason="requires CUDA device")
 def test_laplacian_3d_cuda_matches_cpu():
     n = 10
     rng = np.random.default_rng(4)

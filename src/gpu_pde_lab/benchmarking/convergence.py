@@ -37,6 +37,7 @@ time needed to produce them.
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import dataclass
 
@@ -80,9 +81,9 @@ class ConvergenceResult:
     observed_orders: list[float]  # one per consecutive pair, log2(e1/e2)
 
     @staticmethod
-    def from_points(points: list[ConvergencePoint]) -> "ConvergenceResult":
+    def from_points(points: list[ConvergencePoint]) -> ConvergenceResult:
         orders = []
-        for a, b in zip(points, points[1:]):
+        for a, b in itertools.pairwise(points):
             if b.error_linf > 0 and a.h_or_dt > 0 and b.h_or_dt > 0:
                 ratio_h = a.h_or_dt / b.h_or_dt
                 ratio_e = a.error_linf / b.error_linf

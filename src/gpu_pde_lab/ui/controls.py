@@ -5,7 +5,7 @@ short declarative list rather than hand-wiring Qt layouts each time.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -61,7 +61,7 @@ class FloatSlider(QWidget):
             frac = (math.log(max(value, 1e-12)) - lo) / (hi - lo)
         else:
             frac = (value - self._min) / (self._max - self._min)
-        return int(round(frac * self._resolution))
+        return round(frac * self._resolution)
 
     def _from_slider_pos(self, pos: int) -> float:
         frac = pos / self._resolution

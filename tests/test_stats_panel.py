@@ -11,7 +11,7 @@ from gpu_pde_lab.ui.stats_panel import StatsPanel
 
 
 def test_update_stats_removes_keys_not_present_in_the_new_values():
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     panel = StatsPanel()
 
     panel.update_stats({"Sim time": "0.1", "Viscosity": "1e-4", "Divergence norm": "2.9"})
@@ -26,7 +26,7 @@ def test_update_stats_removes_keys_not_present_in_the_new_values():
 
 
 def test_update_stats_reuses_shared_keys_in_place():
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     panel = StatsPanel()
 
     panel.update_stats({"Grid": "128 x 128", "Backend": "torch/cpu/fp32"})
@@ -43,12 +43,11 @@ def test_switching_live_experiments_does_not_leak_stats_keys():
     from gpu_pde_lab.app import build_benchmark_factories, build_live_factories
     from gpu_pde_lab.ui.main_window import MainWindow
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     win = MainWindow(build_live_factories(), build_benchmark_factories())
     win.show()
-    app.processEvents()
+    _app.processEvents()
 
-    live_names = list(build_live_factories())
     fluid_index = next(
         i for i, e in enumerate(win._combo_entries) if e == ("live", "2D Fluid Simulation")
     )
@@ -74,10 +73,10 @@ def test_switching_to_a_benchmark_experiment_clears_live_stats():
     from gpu_pde_lab.app import build_benchmark_factories, build_live_factories
     from gpu_pde_lab.ui.main_window import MainWindow
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     win = MainWindow(build_live_factories(), build_benchmark_factories())
     win.show()
-    app.processEvents()
+    _app.processEvents()
 
     fluid_index = next(
         i for i, e in enumerate(win._combo_entries) if e == ("live", "2D Fluid Simulation")

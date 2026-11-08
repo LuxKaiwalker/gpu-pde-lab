@@ -4,6 +4,9 @@ from the project spec."""
 
 from __future__ import annotations
 
+import contextlib
+from typing import ClassVar
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -14,17 +17,21 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSlider,
     QSplitter,
     QStackedWidget,
-    QTabWidget,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import (
+    Backend,
+    BackendSpec,
+    cuda_free_memory_bytes,
+    cuda_is_available,
+    cuda_is_usable,
+)
 from ..core.boundary import BoundaryKind
 from ..core.config_io import ConfigValidationError, ExperimentConfig, load_config, save_config
 from ..experiments.base import BenchmarkExperiment, LiveExperiment
@@ -198,9 +205,17 @@ class MainWindow(QMainWindow):
         # active device are otherwise only visible by opening a specific
         # experiment's stats panel, with no at-a-glance indicator anywhere
         # else in the window.
-        if cuda_is_available():
+        if cuda_is_usable():
             name = Backend(BackendSpec("torch", "cuda", "fp32")).device_name()
             return f"GPU: {name}"
+        # Distinguish "you have no GPU" from "you have one but something else
+        # is using it" -- the second is a transient condition the user can
+        # act on, and reporting it as "not available" sends them looking for
+        # a driver problem that isn't there.
+        if cuda_is_available():
+            free = cuda_free_memory_bytes()
+            detail = f"only {free / 1024 ** 2:.0f} MB free" if free is not None else "device full"
+            return f"GPU: present but unusable ({detail}) -- running on CPU"
         return "GPU: not available (CPU only)"
 
     def _build_ui(self) -> None:
@@ -286,7 +301,9 @@ class MainWindow(QMainWindow):
     # in different, more meaningful groups. Any experiment not named here
     # (e.g. one added later without updating this list) still appears, under
     # an "Other" group, rather than silently vanishing from the menu.
-    _CATEGORY_ORDER = [
+    # Read-only ordering table; annotated so ruff knows the mutable
+    # default is a constant and not shared per-instance state.
+    _CATEGORY_ORDER: ClassVar[list[tuple[str, list[str]]]] = [
         ("PDE Simulations", [
             "Heat Equation (+ Stability)", "3D Heat Equation", "Wave Equation",
             "Poisson Equation (Iterative Solvers)", "2D Fluid Simulation",
@@ -544,10 +561,8 @@ class MainWindow(QMainWindow):
 
         exp.n = config.nx
         if hasattr(exp, "boundary"):
-            try:
+            with contextlib.suppress(ValueError):
                 exp.boundary = BoundaryKind(config.boundary)
-            except ValueError:
-                pass
         exp.reset()
 
         try:

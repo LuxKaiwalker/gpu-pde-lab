@@ -22,6 +22,6 @@ def test_build_quiver_segments_rejects_shape_mismatch():
     v = np.zeros((5, 5))
     try:
         build_quiver_segments(u, v)
-        assert False, "expected ValueError"
+        raise AssertionError("expected ValueError")
     except ValueError:
         pass

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from gpu_pde_lab.core.backend import Backend, BackendSpec, cuda_is_available
+from gpu_pde_lab.core.backend import Backend, BackendSpec, cuda_is_usable
 from gpu_pde_lab.core.grid import Grid2D
 
 
@@ -31,7 +31,7 @@ def test_backend_torch_cpu_roundtrip():
     assert b.sum(arr) == pytest.approx(16.0, rel=1e-5)
 
 
-@pytest.mark.skipif(not cuda_is_available(), reason="requires CUDA device")
+@pytest.mark.skipif(not cuda_is_usable(), reason="requires CUDA device")
 def test_backend_cuda_roundtrip():
     b = Backend(BackendSpec("torch", "cuda", "fp32"))
     arr = b.array(np.ones((8, 8)))

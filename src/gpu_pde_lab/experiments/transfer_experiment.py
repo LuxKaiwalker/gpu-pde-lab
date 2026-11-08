@@ -4,7 +4,7 @@ every step is costly compared to keeping the simulation GPU-resident."""
 from __future__ import annotations
 
 from ..benchmarking.suite import benchmark_transfer
-from ..core.backend import cuda_is_available
+from ..core.backend import cuda_is_usable
 from ..ui.controls import ControlPanel
 from .base import BenchmarkExperiment
 
@@ -48,7 +48,7 @@ class TransferExperiment(BenchmarkExperiment):
         return EXPLANATION
 
     def run(self) -> dict:
-        if not cuda_is_available():
+        if not cuda_is_usable():
             return {"summary": "No CUDA device available -- cannot run transfer experiment.",
                      "line_plots": [], "bar_charts": []}
 

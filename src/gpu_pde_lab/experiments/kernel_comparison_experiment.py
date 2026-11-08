@@ -4,7 +4,6 @@ five ways, to make "why GPUs are fast" concrete rather than assumed."""
 from __future__ import annotations
 
 from ..benchmarking.kernel_comparison import run_kernel_comparison
-from ..core.backend import cuda_is_available
 from ..ui.controls import ControlPanel
 from .base import BenchmarkExperiment
 

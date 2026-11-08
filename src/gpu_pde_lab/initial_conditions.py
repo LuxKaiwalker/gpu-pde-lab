@@ -37,7 +37,7 @@ def multiple_sources(X: np.ndarray, Y: np.ndarray, amplitude: float = 1.0, sigma
 
 def hot_cold_regions(X: np.ndarray, Y: np.ndarray, amplitude: float = 1.0) -> np.ndarray:
     lx = X.max()
-    u = np.where(X < lx / 2, amplitude, -amplitude)
+    u = np.where(lx / 2 > X, amplitude, -amplitude)
     return u.astype(X.dtype)
 
 
@@ -54,10 +54,7 @@ def gradient(X: np.ndarray, Y: np.ndarray, angle_deg: float = 0.0, lo: float = 0
     dirx, diry = np.cos(theta), np.sin(theta)
     proj = X * dirx + Y * diry
     proj_min, proj_max = proj.min(), proj.max()
-    if proj_max - proj_min < 1e-12:
-        t = np.zeros_like(proj)
-    else:
-        t = (proj - proj_min) / (proj_max - proj_min)
+    t = np.zeros_like(proj) if proj_max - proj_min < 1e-12 else (proj - proj_min) / (proj_max - proj_min)
     return (lo + t * (hi - lo)).astype(X.dtype)
 
 

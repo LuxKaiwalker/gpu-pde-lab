@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..benchmarking.timer import timed
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import Backend, BackendSpec, cuda_is_usable
 from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from ..pdes.heat import HeatEquation
@@ -48,7 +48,7 @@ class PrecisionExperiment(BenchmarkExperiment):
         return EXPLANATION
 
     def _run_one(self, precision: str, n_steps: int, dt: float):
-        backend = Backend(BackendSpec("torch", "cuda" if cuda_is_available() else "cpu", precision))
+        backend = Backend(BackendSpec("torch", "cuda" if cuda_is_usable() else "cpu", precision))
         grid = Grid2D(nx=self.n, ny=self.n)
         heat = HeatEquation(grid, backend, BoundaryKind.NEUMANN, alpha=self.alpha)
         heat.reset(ic="gaussian")
@@ -76,7 +76,7 @@ class PrecisionExperiment(BenchmarkExperiment):
                 times[p] = elapsed
                 mems[p] = mem
                 finites[p] = finite
-            except RuntimeError as e:
+            except RuntimeError:
                 fields[p] = None
                 times[p] = float("nan")
                 mems[p] = None

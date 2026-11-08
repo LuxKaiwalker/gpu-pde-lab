@@ -65,7 +65,7 @@ class ConvergenceExperiment(BenchmarkExperiment):
 
         expected = "2 (space)" if self.mode == "spatial" else "1 (time, until floor)"
         rows = [f"| {x_label} | L-inf error |", "|---|---|"]
-        for x, e in zip(xs, errs):
+        for x, e in zip(xs, errs, strict=False):
             rows.append(f"| {x:.3e} | {e:.3e} |")
 
         summary = (

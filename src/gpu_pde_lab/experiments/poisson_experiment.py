@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import Backend, BackendSpec, cuda_is_usable
 from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from ..pdes.poisson import PoissonProblem
@@ -80,12 +80,12 @@ class PoissonExperiment(LiveExperiment):
     def __init__(self):
         self.n = 128
         self.method = "conjugate_gradient"
-        self.backend_name = "GPU" if cuda_is_available() else "CPU"
+        self.backend_name = "GPU" if cuda_is_usable() else "CPU"
         self.n_sources = 2
         self._build_problem()
 
     def _make_backend(self) -> Backend:
-        if self.backend_name == "GPU" and cuda_is_available():
+        if self.backend_name == "GPU" and cuda_is_usable():
             return Backend(BackendSpec("torch", "cuda", "fp32"))
         return Backend(BackendSpec("torch", "cpu", "fp32"))
 
@@ -189,7 +189,7 @@ class PoissonExperiment(LiveExperiment):
         panel.add_combo("Number of sources", ["1", "2", "3", "4"], current=str(self.n_sources),
                          on_change=set_sources)
 
-        backend_opts = ["GPU", "CPU"] if cuda_is_available() else ["CPU"]
+        backend_opts = ["GPU", "CPU"] if cuda_is_usable() else ["CPU"]
 
         def set_backend(text):
             self.backend_name = text

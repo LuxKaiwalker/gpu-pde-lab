@@ -4,7 +4,7 @@ both backends across a sweep of grid sizes."""
 from __future__ import annotations
 
 from ..benchmarking.suite import run_cpu_gpu_sweep
-from ..core.backend import cuda_is_available
+from ..core.backend import cuda_is_usable
 from ..ui.controls import ControlPanel
 from .base import BenchmarkExperiment
 
@@ -51,7 +51,7 @@ class CpuGpuExperiment(BenchmarkExperiment):
         return EXPLANATION
 
     def run(self) -> dict:
-        if not cuda_is_available():
+        if not cuda_is_usable():
             return {"summary": "No CUDA device available -- cannot run CPU vs GPU comparison.",
                      "line_plots": []}
 
@@ -62,7 +62,7 @@ class CpuGpuExperiment(BenchmarkExperiment):
 
         lines = ["| N | CPU ms/step | GPU ms/step | Speedup | GPU BW (GB/s) | GPU mem (MB) |",
                  "|---|---|---|---|---|---|"]
-        for n, c, g, s in zip(result.sizes, result.cpu, result.gpu, speedups):
+        for n, c, g, s in zip(result.sizes, result.cpu, result.gpu, speedups, strict=False):
             lines.append(f"| {n} | {c.seconds_per_step*1e3:.3f} | {g.seconds_per_step*1e3:.3f} | "
                          f"{s:.1f}x | {g.bandwidth_gb_s:.1f} | {g.gpu_memory_mb:.2f} |")
 

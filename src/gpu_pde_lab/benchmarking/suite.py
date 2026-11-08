@@ -8,11 +8,11 @@ from the interactive UI's performance dashboard.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import Backend, BackendSpec, PrecisionKind, cuda_is_usable
 from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from .bandwidth import estimate_bandwidth
@@ -21,7 +21,9 @@ from .timer import Stopwatch, timed
 try:
     import torch
 except ImportError:  # pragma: no cover
-    torch = None
+    # Typed as Any so the None fallback is assignable; the module is optional
+    # at import time and every use is guarded.
+    torch = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -71,23 +73,27 @@ class CpuGpuSweepResult:
     def speedups(self) -> list[float]:
         if not self.gpu:
             return []
-        return [c.seconds_per_step / g.seconds_per_step for c, g in zip(self.cpu, self.gpu)]
+        return [c.seconds_per_step / g.seconds_per_step for c, g in zip(self.cpu, self.gpu, strict=False)]
 
 
-def run_cpu_gpu_sweep(sizes: list[int], precision: str = "fp32", alpha: float = 0.1,
+def run_cpu_gpu_sweep(sizes: list[int], precision: PrecisionKind = "fp32", alpha: float = 0.1,
                        n_steps: int = 50) -> CpuGpuSweepResult:
     cpu_results = []
     gpu_results = []
-    has_cuda = cuda_is_available()
+    has_cuda = cuda_is_usable()
 
     for n in sizes:
         grid = Grid2D(nx=n, ny=n)
         cpu_backend = Backend(BackendSpec("torch", "cpu", precision if precision != "fp16" else "fp32"))
-        cpu_results.append(benchmark_heat_step(grid, cpu_backend, BoundaryKind.NEUMANN, alpha, n_steps=n_steps))
+        cpu_results.append(
+            benchmark_heat_step(grid, cpu_backend, BoundaryKind.NEUMANN, alpha, n_steps=n_steps)
+        )
 
         if has_cuda:
             gpu_backend = Backend(BackendSpec("torch", "cuda", precision))
-            gpu_results.append(benchmark_heat_step(grid, gpu_backend, BoundaryKind.NEUMANN, alpha, n_steps=n_steps))
+            gpu_results.append(
+                benchmark_heat_step(grid, gpu_backend, BoundaryKind.NEUMANN, alpha, n_steps=n_steps)
+            )
 
     return CpuGpuSweepResult(sizes=sizes, cpu=cpu_results, gpu=gpu_results if has_cuda else None)
 
@@ -113,7 +119,6 @@ def benchmark_transfer(n: int, n_steps: int = 20, alpha: float = 0.1) -> Transfe
     from ..pdes.heat import HeatEquation
 
     grid = Grid2D(nx=n, ny=n)
-    cpu_backend = Backend(BackendSpec("torch", "cpu", "fp32"))
     gpu_backend = Backend(BackendSpec("torch", "cuda", "fp32"))
 
     host_field = np.random.default_rng(0).standard_normal((n, n)).astype(np.float32)

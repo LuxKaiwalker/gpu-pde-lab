@@ -17,7 +17,7 @@ import time
 
 import numpy as np
 
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import Backend, BackendSpec, cuda_is_usable
 from ..core.boundary import BoundaryKind
 from ..core.grid import Grid3D
 from ..pdes.heat_3d import HeatEquation3D
@@ -87,13 +87,13 @@ class Heat3DExperiment(LiveExperiment):
         self.allow_unstable = False
         self.boundary = BoundaryKind.NEUMANN
         self.ic = "gaussian"
-        self.backend_name = "GPU" if cuda_is_available() else "CPU"
+        self.backend_name = "GPU" if cuda_is_usable() else "CPU"
         self._last_dt_used = 0.0
         self._fps_timestamps: list[float] = []
         self._build_pde()
 
     def _make_backend(self) -> Backend:
-        if self.backend_name == "GPU" and cuda_is_available():
+        if self.backend_name == "GPU" and cuda_is_usable():
             return Backend(BackendSpec("torch", "cuda", "fp32"))
         return Backend(BackendSpec("torch", "cpu", "fp32"))
 
@@ -223,7 +223,7 @@ class Heat3DExperiment(LiveExperiment):
         panel.add_combo("Initial condition", ["gaussian", "zeros"], current=self.ic,
                          on_change=set_ic)
 
-        backend_opts = ["GPU", "CPU"] if cuda_is_available() else ["CPU"]
+        backend_opts = ["GPU", "CPU"] if cuda_is_usable() else ["CPU"]
 
         def set_backend(text):
             self.backend_name = text

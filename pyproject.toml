@@ -1,7 +1,7 @@
 [project]
 name = "gpu-pde-lab"
-version = "0.1.0"
-description = "An interactive laboratory for exploring GPU-accelerated numerical PDE solvers"
+version = "0.2.0"
+description = "GPU-accelerated PDE solvers, an interactive lab to explore them, and a roofline benchmark of how close they get to the hardware"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -11,23 +11,38 @@ requires-python = ">=3.11"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Intended Audience :: Education",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Visualization",
 ]
+
+# The solver core is the only hard dependency set. The desktop lab and the
+# benchmark reporting are extras, so `pip install gpu-pde-lab` gives you
+# importable solvers without pulling in Qt -- which matters for CI, for
+# headless benchmark machines, and for anyone who wants the numerics as a
+# library. See doc.md section 5.
 dependencies = [
     "numpy",
     "torch",
-    "pyqtgraph",
-    "PySide6",
 ]
+
+[project.optional-dependencies]
+# The desktop application.
+lab = ["pyqtgraph", "PySide6"]
+# Headless benchmarking with figures.
+bench = ["matplotlib"]
+dev = ["pytest", "matplotlib", "pyqtgraph", "PySide6", "ruff", "mypy"]
+# Everything.
+all = ["pyqtgraph", "PySide6", "matplotlib"]
+
+[project.scripts]
+gpu-pde-lab = "gpu_pde_lab.app:main"
 
 [project.urls]
 Repository = "https://github.com/LuxKaiwalker/gpu-pde-lab"
-
-[project.optional-dependencies]
-dev = ["pytest", "matplotlib"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -38,3 +53,81 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests that need a GPU skip themselves via cuda_is_usable(); this marker is
+# for the ones that are also slow enough to want excluding by hand.
+markers = [
+    "slow: long-running benchmarks, deselect with '-m \"not slow\"'",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    # Assigning a lambda is the clearest form for the one-line backend
+    # dispatch helpers, and `timed(backend, lambda: ...)` is the harness's
+    # whole interface.
+    "E731",
+    # Loop-variable binding in a closure is deliberate throughout the
+    # benchmark harness, where `lambda s=step: s(...)` is the idiom that
+    # captures by value.
+    "B023",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts insert src/ on sys.path before importing, which has to happen after
+# the import block.
+"scripts/*.py" = ["E402"]
+# The Triton kernel's body is written against triton.language semantics, where
+# chained comparisons and numpy-style broadcasting do not mean what ruff
+# assumes; and `tl` is only bound inside the import guard.
+"src/gpu_pde_lab/kernels/triton_stencil.py" = ["F821"]
+# Explanation panels embed display LaTeX. A $$...$$ equation cannot be wrapped
+# at 110 columns without breaking the math, and these strings are rendered
+# text rather than code.
+"src/gpu_pde_lab/experiments/*.py" = ["E501"]
+"src/gpu_pde_lab/pdes/poisson.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+# Scoped to the layers that are clean rather than set to a level the whole
+# tree already passes. core/, kernels/ and benchmarking/ are the solver and
+# measurement code -- the parts whose correctness the published numbers rest
+# on -- and they type-check with no errors.
+#
+# ui/, experiments/ and pdes/ are not in scope yet: they carry ~37 errors,
+# almost all from arrays that are deliberately duck-typed across NumPy and
+# Torch (the whole point of core/backend.py) and from PySide6 signal
+# attributes mypy cannot see. Widening the scope is worth doing; claiming it
+# is already done by loosening the settings until the tree passes is not.
+files = [
+    "src/gpu_pde_lab/core",
+    "src/gpu_pde_lab/kernels",
+    "src/gpu_pde_lab/benchmarking",
+]
+ignore_missing_imports = true
+# Deliberately not --strict. The array code is duck-typed across NumPy and
+# Torch on purpose -- that polymorphism is the point of core/backend.py, and
+# annotating it precisely would mean either lying about the types or
+# importing both libraries into every signature.
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+# Triton's decorators are opaque to mypy: a @triton.jit function is rewritten
+# at import time and its "body" is never executed as Python.
+module = "gpu_pde_lab.kernels.triton_stencil"
+ignore_errors = true

@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import Backend, BackendSpec, cuda_is_usable
 from ..core.boundary import BoundaryKind
 from ..core.grid import Grid2D
 from ..pdes.wave import WaveEquation
@@ -72,14 +72,14 @@ class WaveExperiment(LiveExperiment):
         self.allow_unstable = False
         self.boundary = BoundaryKind.DIRICHLET
         self.ic = "gaussian"
-        self.backend_name = "GPU" if cuda_is_available() else "CPU"
+        self.backend_name = "GPU" if cuda_is_usable() else "CPU"
         self.precision = "fp32"
         self._last_dt_used = 0.0
         self._fps_timestamps: list[float] = []
         self._build_pde()
 
     def _make_backend(self) -> Backend:
-        if self.backend_name == "GPU" and cuda_is_available():
+        if self.backend_name == "GPU" and cuda_is_usable():
             return Backend(BackendSpec("torch", "cuda", self.precision))
         return Backend(BackendSpec("torch", "cpu", self.precision if self.precision != "fp16" else "fp32"))
 
@@ -233,7 +233,7 @@ class WaveExperiment(LiveExperiment):
         panel.add_combo("Initial condition", ["gaussian", "point_source", "multiple_sources", "zeros"],
                          current=self.ic, on_change=set_ic)
 
-        backend_opts = ["GPU", "CPU"] if cuda_is_available() else ["CPU"]
+        backend_opts = ["GPU", "CPU"] if cuda_is_usable() else ["CPU"]
 
         def set_backend(text):
             self.backend_name = text

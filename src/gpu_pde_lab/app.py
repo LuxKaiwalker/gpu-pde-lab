@@ -68,7 +68,10 @@ def _acquire_single_instance_lock() -> bool:
     """
     global _lock_file
     lock_dir = os.environ.get("XDG_RUNTIME_DIR", tempfile.gettempdir())
-    _lock_file = open(os.path.join(lock_dir, "gpu_pde_lab.lock"), "w")
+    # Deliberately not a context manager: closing the file drops the flock,
+    # so the handle has to outlive this function for the lock to mean
+    # anything. The module-level reference is what keeps it open.
+    _lock_file = open(os.path.join(lock_dir, "gpu_pde_lab.lock"), "w")  # noqa: SIM115
     try:
         fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:

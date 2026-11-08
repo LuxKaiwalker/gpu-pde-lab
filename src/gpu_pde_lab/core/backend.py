@@ -35,7 +35,85 @@ _PRECISION_TO_NP = {
 
 
 def cuda_is_available() -> bool:
+    """True if a CUDA device is present and the driver answers.
+
+    Presence is not the same as usability -- see :func:`cuda_is_usable`. This
+    is the right check for "should a CUDA code path exist at all"; it is the
+    wrong check for "can I allocate on it right now".
+    """
     return torch is not None and torch.cuda.is_available()
+
+
+#: Floor for calling CUDA usable. A CUDA context costs a few hundred MB
+#: before a single grid cell is allocated, and the benchmark sweep reaches
+#: 4096x4096 (64 MB per fp32 buffer, several buffers live at once). Below
+#: this we would start, then die partway through a sweep -- which is a worse
+#: failure than declining up front.
+MIN_CUDA_FREE_BYTES = 512 * 1024 * 1024
+
+_cuda_usable_cache: tuple[int, bool] | None = None
+
+
+def cuda_free_memory_bytes() -> int | None:
+    """Free device memory in bytes, or None if that cannot be determined.
+
+    Note this reports what the *driver* says is free, which accounts for
+    every process on the card -- not just this one. A machine running
+    something else GPU-heavy (an inference server, another training job)
+    can leave a perfectly healthy device with nothing left to allocate.
+    """
+    if not cuda_is_available():
+        return None
+    try:
+        free, _total = torch.cuda.mem_get_info()
+        return int(free)
+    except Exception:
+        # mem_get_info has to initialize a CUDA context to answer, and that
+        # initialization is itself an allocation that can fail when the card
+        # is full. An unanswerable query means "assume nothing is free".
+        return None
+
+
+def cuda_is_usable(min_free_bytes: int = MIN_CUDA_FREE_BYTES) -> bool:
+    """True if CUDA is present *and* has room to actually run something.
+
+    Probes with a real allocation rather than trusting the free-memory
+    figure, because a context that cannot be created at all reports no
+    figure to trust. The result is cached per threshold: the probe costs a
+    context initialization, and callers ask this question in loops.
+    """
+    global _cuda_usable_cache
+    if not cuda_is_available():
+        return False
+    if _cuda_usable_cache is not None and _cuda_usable_cache[0] == min_free_bytes:
+        return _cuda_usable_cache[1]
+
+    usable = False
+    try:
+        free = cuda_free_memory_bytes()
+        if free is not None and free >= min_free_bytes:
+            # Allocate for real. mem_get_info can report memory that
+            # fragmentation or another process's reservation makes
+            # unobtainable in practice.
+            probe = torch.zeros(1024 * 1024, dtype=torch.float32, device="cuda")
+            del probe
+            torch.cuda.empty_cache()
+            usable = True
+    except Exception:
+        usable = False
+
+    _cuda_usable_cache = (min_free_bytes, usable)
+    return usable
+
+
+def reset_cuda_usable_cache() -> None:
+    """Forget the cached :func:`cuda_is_usable` probe.
+
+    Device pressure comes and goes with other processes, so a long-running
+    session may want to re-ask. Tests use this to assert both branches.
+    """
+    global _cuda_usable_cache
+    _cuda_usable_cache = None
 
 
 @dataclass(frozen=True)
@@ -193,20 +271,69 @@ class Backend:
     def bytes_per_element(self) -> int:
         return {"fp16": 2, "fp32": 4, "fp64": 8}[self.spec.precision]
 
-    def to_device(self, arr, other_backend: "Backend"):
+    def to_device(self, arr, other_backend: Backend):
         """Move/convert an array produced by this backend to another backend."""
         host = self.to_numpy(arr)
         return other_backend.array(host)
 
 
+def cpu_equivalent(spec: BackendSpec) -> BackendSpec:
+    """The nearest CPU spec to ``spec``.
+
+    fp16 is dropped to fp32: NumPy has no usable CPU fp16 and Torch's CPU
+    fp16 is emulated slowly enough that timing it would mislead rather than
+    inform.
+    """
+    precision = "fp32" if spec.precision == "fp16" else spec.precision
+    return BackendSpec(spec.engine, "cpu", precision)
+
+
+def make_backend(spec: BackendSpec, allow_cpu_fallback: bool = True) -> tuple[Backend, str | None]:
+    """Build a backend, degrading to CPU rather than raising when asked for an
+    unusable CUDA device.
+
+    Returns ``(backend, warning)``. ``warning`` is None on success and a
+    human-readable explanation when the request was downgraded, so the caller
+    can surface *why* it is suddenly running on the CPU instead of leaving
+    the user to guess from the frame rate.
+
+    Raising was the old behaviour and it is the wrong one for an interactive
+    lab: a card that is merely busy with someone else's process is not a
+    reason to refuse to run the mathematics.
+    """
+    if spec.device == "cuda" and not cuda_is_usable():
+        if not allow_cpu_fallback:
+            raise RuntimeError("CUDA requested but not usable (absent, or out of free memory)")
+        free = cuda_free_memory_bytes()
+        if not cuda_is_available():
+            why = "no CUDA device is present"
+        elif free is None:
+            why = "the CUDA context could not be created (device likely full)"
+        else:
+            why = (
+                f"only {free / 1024 ** 2:.0f} MB of device memory is free, "
+                f"below the {MIN_CUDA_FREE_BYTES / 1024 ** 2:.0f} MB floor"
+            )
+        fallback = cpu_equivalent(spec)
+        return Backend(fallback), (
+            f"Requested {spec.label()} but {why}; running on {fallback.label()} instead."
+        )
+    return Backend(spec), None
+
+
 def available_backend_specs() -> list[BackendSpec]:
+    """Specs that can actually be constructed right now.
+
+    Gated on :func:`cuda_is_usable` rather than mere availability so the UI
+    never offers a backend that would throw the moment it is selected.
+    """
     specs = [
         BackendSpec("numpy", "cpu", "fp32"),
         BackendSpec("numpy", "cpu", "fp64"),
         BackendSpec("torch", "cpu", "fp32"),
         BackendSpec("torch", "cpu", "fp64"),
     ]
-    if cuda_is_available():
+    if cuda_is_usable():
         specs += [
             BackendSpec("torch", "cuda", "fp16"),
             BackendSpec("torch", "cuda", "fp32"),
@@ -222,7 +349,7 @@ class WallClock:
         self.backend = backend
         self._t0 = 0.0
 
-    def __enter__(self) -> "WallClock":
+    def __enter__(self) -> WallClock:
         self.backend.synchronize()
         self._t0 = time.perf_counter()
         return self

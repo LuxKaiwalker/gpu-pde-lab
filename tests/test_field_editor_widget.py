@@ -60,7 +60,9 @@ def test_bind_fields_populates_combo_and_shows_widget(qapp):
     editor = _bound_editor(qapp)
     assert editor.field_combo.count() == 1
     assert editor.field_combo.itemText(0) == "Initial u"
-    assert editor.isVisible() or not editor.isVisible()  # offscreen visibility is unreliable; just must not raise
+    # Offscreen visibility is unreliable; the point is only that querying it
+    # does not raise.
+    assert editor.isVisible() or not editor.isVisible()
     assert not editor.has_unapplied_edits()
 
 

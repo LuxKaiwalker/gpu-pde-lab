@@ -38,7 +38,6 @@ def test_laplacian_periodic_matches_nonperiodic_in_interior():
 
 
 def test_laplacian_torch_matches_numpy():
-    import torch
 
     n = 24
     rng = np.random.default_rng(1)

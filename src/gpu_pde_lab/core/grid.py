@@ -38,7 +38,7 @@ class Grid2D:
     def num_cells(self) -> int:
         return self.nx * self.ny
 
-    def resized(self, nx: int, ny: int) -> "Grid2D":
+    def resized(self, nx: int, ny: int) -> Grid2D:
         return Grid2D(nx=nx, ny=ny, lx=self.lx, ly=self.ly)
 
     def x_coords(self, backend):

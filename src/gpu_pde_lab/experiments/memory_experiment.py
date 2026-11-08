@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..benchmarking.memory import cuda_memory_snapshot, estimate_memory, format_bytes
-from ..core.backend import Backend, BackendSpec, cuda_is_available
+from ..core.backend import Backend, BackendSpec, cuda_is_usable
 from ..core.grid import Grid2D
 from ..ui.controls import ControlPanel
 from .base import BenchmarkExperiment
@@ -62,7 +62,7 @@ class MemoryExperiment(BenchmarkExperiment):
 
         summary = "\n".join(rows)
 
-        if cuda_is_available():
+        if cuda_is_usable():
             gpu_backend = Backend(BackendSpec("torch", "cuda", self.precision))
             grid = Grid2D(nx=self.n, ny=self.n)
             gpu_backend.reset_peak_memory_stats()

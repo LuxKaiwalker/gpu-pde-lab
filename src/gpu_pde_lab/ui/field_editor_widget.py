@@ -17,7 +17,7 @@ dict passed to `bind_fields()` -- there is no per-PDE subclass.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import pyqtgraph as pg

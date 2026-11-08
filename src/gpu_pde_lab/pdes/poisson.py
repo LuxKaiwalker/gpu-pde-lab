@@ -48,7 +48,7 @@ import numpy as np
 from ..core.backend import Backend
 from ..core.boundary import BoundaryKind, apply_boundary
 from ..core.grid import Grid2D
-from ..core.stencil import laplacian
+from ..core.stencil import laplacian, zeros_like
 
 
 def apply_A(u, dx: float, dy: float, boundary: BoundaryKind):
@@ -121,9 +121,14 @@ class PoissonProblem:
 
     def jacobi_step(self) -> None:
         h2 = self.grid.dx * self.grid.dy
-        b = self.backend
         center = self.u
-        up = center * 0.0
+        # `zeros_like`, not `center * 0.0`: the latter reads the whole array
+        # only to multiply it away, doubling the bandwidth of what should be
+        # a plain zero-fill. core/stencil.py makes the same point about the
+        # same mistake; this is the other hot path it applies to, since both
+        # the Poisson solver and the fluid pressure projection run this
+        # dozens of times per frame.
+        up = zeros_like(center)
         up[1:-1, 1:-1] = (
             center[:-2, 1:-1] + center[2:, 1:-1] + center[1:-1, :-2] + center[1:-1, 2:]
             + h2 * self.f[1:-1, 1:-1]

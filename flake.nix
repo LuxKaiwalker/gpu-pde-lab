@@ -57,6 +57,14 @@
         # force it here. Override manually after entering the shell if needed.
         export QT_QPA_PLATFORM=xcb
 
+        # Triton locates libcuda.so.1 by shelling out to `/sbin/ldconfig -p`,
+        # which does not exist on NixOS -- so `import triton` raises
+        # FileNotFoundError before it ever looks at the GPU. The documented
+        # override skips that probe entirely. The NVIDIA driver's libraries
+        # live under /run/opengl-driver/lib on NixOS (already on
+        # LD_LIBRARY_PATH above for PyTorch's own sake).
+        export TRITON_LIBCUDA_PATH=/run/opengl-driver/lib
+
         echo "GPU PDE Lab dev environment ready. Python: $(python3 --version)"
       '';
     };

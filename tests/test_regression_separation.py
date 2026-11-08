@@ -12,7 +12,7 @@ def test_heatmap_set_field_does_not_mutate_input():
 
     from gpu_pde_lab.ui.viz.heatmap import HeatmapView
 
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])
     view = HeatmapView()
 
     data = np.random.default_rng(0).standard_normal((16, 16))
