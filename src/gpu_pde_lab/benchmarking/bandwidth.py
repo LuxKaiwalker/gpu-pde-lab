@@ -14,6 +14,15 @@ trip counted as read+write), and read/write the updated u (1 array round
 trip). This is intentionally a simple, documented accounting -- real GPU
 profilers (nsight, nvprof) measure actual DRAM traffic, which this estimate
 approximates but does not replace.
+
+Worth knowing how far off it is: the 4-pass model is the right *conceptual*
+account and about 8x optimistic about the eager path. In eager mode every
+intermediate in the stencil expression is its own full-sized tensor with its
+own round trip, so the measured figure is ~33 passes -- see
+``scripts/count_kernels.py``, which counts it at the dispatch layer, and
+``benchmarking/roofline.py``, which uses the irreducible 2-pass requirement as
+its metric instead so that wasted traffic shows up as a lower score rather than
+a higher one.
 """
 
 from __future__ import annotations

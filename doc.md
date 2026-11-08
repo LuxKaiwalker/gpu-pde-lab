@@ -271,10 +271,49 @@ finish it."
 `benchmarking/bandwidth.py` estimates effective memory bandwidth
 ($\text{bytes moved} / \text{runtime}$) for the heat-equation stencil,
 illustrating that stencil PDE solvers are typically memory-bandwidth-bound,
-not FLOP-bound — on this RTX 2080 Ti, the observed effective bandwidth for
-the (non-fused, multi-pass) implementation here saturates around ~60 GB/s at
-large grid sizes, well under the card's peak HBM bandwidth, which is itself
-a teaching point about the cost of unfused elementwise kernels.
+not FLOP-bound.
+
+Its accounting is a conceptual model — read `u`, write the Laplacian, read it
+back, write the new `u`, so 4 array-sized transfers — and that model turns out
+to be about **8× optimistic**. In eager mode every intermediate in
+`(north + south - 2*center)/dx² + (east + west - 2*center)/dy²` is its own
+full-sized tensor with its own round trip to memory. The measured figure is
+**~33 array passes per step**, counted at the dispatch layer by
+`scripts/count_kernels.py` rather than by hand.
+
+### 8.1 The roofline
+
+`benchmarking/roofline.py` answers the question the above raises: given the GPU,
+how much of it is this code actually using? It measures four implementations of
+the identical heat step (`src/gpu_pde_lab/kernels/`) against two ceilings — the
+card's spec-sheet peak derived from its reported memory clock and bus width, and
+an empirically measured device-to-device `memcpy` at the same array size, which
+is the honest ceiling for a read-once-write-once kernel.
+
+On this RTX 2080 Ti (peak 616 GB/s), at fp32 with Neumann boundaries:
+
+| Implementation | kernels/step | array passes | best speedup | peak % of memcpy ceiling |
+|---|---|---|---|---|
+| `baseline` (eager slices) | 17 | ~33 | 1.00× | 7% |
+| `cuda_graph` (captured, replayed) | 18 | ~33 | 5.03× | 13% |
+| `compiled` (`torch.compile`) | 4 | fused | 3.25× | 23% |
+| `triton` (hand-written fused) | **1** | **2** | **12.91×** | **93%** |
+
+The two optimized implementations fix different bottlenecks, which is why both
+are kept. `cuda_graph` removes per-launch host overhead and moves exactly as much
+memory as the baseline — it wins 5× at N=128 and *loses* (0.92×) at N≥1024.
+`triton` removes the memory traffic and wins everywhere, most at large N where
+the field no longer fits in L2. A single wall-clock number cannot distinguish
+launch-bound from bandwidth-bound, and the fixes are unrelated.
+
+Bandwidth is reported as **useful** bytes — the one read and one write the
+computation irreducibly requires — divided by measured time, so every
+implementation is scored against the same numerator and waste shows up as a
+lower figure rather than being credited.
+
+Full numbers, including the raw CSV and the device they were taken on:
+[`docs/results/roofline.md`](docs/results/roofline.md). Regenerate with
+`python scripts/run_roofline.py`.
 
 ## 9. How to add a new PDE
 
