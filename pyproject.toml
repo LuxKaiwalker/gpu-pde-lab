@@ -3,13 +3,19 @@ name = "gpu-pde-lab"
 version = "0.2.0"
 description = "GPU-accelerated PDE solvers, an interactive lab to explore them, and a roofline benchmark of how close they get to the hardware"
 readme = "README.md"
+# PEP 639 license expression. The matching "License :: OSI Approved :: MIT
+# License" classifier is deliberately absent: setuptools >= 77 treats the two
+# together as a configuration error ("License classifiers have been superseded
+# by license expressions"), which fails the build outright. Local editable
+# installs predating that setuptools kept working, so this only ever surfaced
+# in CI, where the build runs isolated against the current release.
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "LuxKaiwalker" },
 ]
 requires-python = ">=3.11"
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -34,7 +40,18 @@ dependencies = [
 lab = ["pyqtgraph", "PySide6"]
 # Headless benchmarking with figures.
 bench = ["matplotlib"]
-dev = ["pytest", "matplotlib", "pyqtgraph", "PySide6", "ruff", "mypy"]
+# ruff and mypy are pinned to a minor series. Unpinned, a new release that
+# adds a rule or tightens an inference turns CI red on a commit that changed
+# nothing -- the failure is real but it is not the contributor's, and it lands
+# on whoever pushes next. Widen deliberately, not by accident.
+dev = [
+    "pytest",
+    "matplotlib",
+    "pyqtgraph",
+    "PySide6",
+    "ruff>=0.17,<0.18",
+    "mypy>=2.4,<3",
+]
 # Everything.
 all = ["pyqtgraph", "PySide6", "matplotlib"]
 
