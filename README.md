@@ -126,10 +126,31 @@ shelling out to `/sbin/ldconfig`, which NixOS does not have).
 docker build -t gpu-pde-lab .
 docker run --rm --gpus all gpu-pde-lab                       # what can this machine run?
 docker run --rm --gpus all gpu-pde-lab python scripts/run_roofline.py
+docker run --rm --gpus all gpu-pde-lab pytest -q
 ```
 
 Needs `nvidia-container-toolkit` for the GPU. Headless; see the Dockerfile for the
-GUI caveat.
+GUI caveat, and for the two extra flags rootless **podman** wants (it refuses
+unqualified image names and requires a signature policy, neither of which docker
+does).
+
+The image is built and exercised rather than merely written: the suite runs inside
+it unaided at 131 passed / 31 skipped, the skips being the CUDA tests correctly
+declining a GPU-less container, and 131 + 31 matches the host count. Running it
+also produced the strongest evidence in this repository that the figures are
+generated rather than screenshotted — regenerating all seven inside the container
+yields files **bit-identical by sha256** to the committed ones, across
+nix-on-NixOS and Ubuntu-in-a-container:
+
+```bash
+docker run --rm -v "$PWD/out:/work/docs/figures" gpu-pde-lab \
+    python scripts/make_figures.py
+sha256sum out/*.png docs/figures/*.png | sort | uniq -c -w64
+```
+
+`scripts/count_kernels.py` likewise reports the same 33 array passes from inside
+the container that it reports on the host, so the number quoted above is
+reproducible off this machine.
 
 ## Run
 

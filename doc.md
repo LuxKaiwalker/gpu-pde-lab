@@ -97,14 +97,37 @@ pip install -e .
 
 ### Other platforms
 
-Any Python 3.11+ environment works — `pip install -e .` pulls in NumPy,
-PyTorch (CUDA build optional; the app runs CPU-only if no GPU is present, it
-just won't have a CUDA backend to compare against), PySide6, and pyqtgraph
-automatically via `pyproject.toml`:
+Any Python 3.11+ environment works. The project installs in three pieces, so
+the solver core comes without Qt:
 
 ```bash
-pip install -e .
+pip install -e .            # core: core/, pdes/, kernels/, benchmarking/
+pip install -e ".[lab]"     # + the desktop app (PySide6, pyqtgraph)
+pip install -e ".[bench]"   # + figures and benchmark plots (matplotlib)
+pip install -e ".[all]"     # everything
 ```
+
+The CUDA build of PyTorch is optional. Without a GPU the app runs CPU-only; it
+just has no CUDA backend to compare against, and the device-specific
+experiments say so rather than failing.
+
+### Docker
+
+```bash
+docker build -t gpu-pde-lab .
+docker run --rm --gpus all gpu-pde-lab pytest -q
+```
+
+Needs `nvidia-container-toolkit` for the GPU. The image is verified rather
+than merely written: the suite runs inside it unaided at 131 passed / 31
+skipped, the skips being the CUDA tests correctly declining a GPU-less
+container.
+
+Rootless podman works too and needs no daemon, which makes it the easier
+option on NixOS. It is stricter than docker in two ways that are not
+properties of the Dockerfile — it refuses unqualified image names, and it
+requires a signature policy — so it needs two extra flags. The Dockerfile's
+header has the exact invocation.
 
 ## 3. Running it
 
